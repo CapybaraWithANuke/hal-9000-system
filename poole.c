@@ -9,6 +9,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <stdlib.h>
+
+#include "commonfuncs.h"
 
 #define print(x) write(1, x, strlen(x));
 
@@ -22,28 +25,6 @@ typedef struct{
 } Poole;
 
 Poole poole;
-
-char * read_until(int fd, char end) {
-	char *string = NULL;
-	char c;
-	int i = 0, size;
-
-	while (1) {
-		size = read(fd, &c, sizeof(char));
-		if(string == NULL){
-			string = (char *) malloc(sizeof(char));
-		}
-		if(c != end && size > 0){
-			string = (char *) realloc(string, sizeof(char)*(i + 2));
-			string[i++] = c;
-		}
-		else{
-			break;
-		}
-	}
-	string[i] = '\0';
-	return string;
-}
 
 void free_everything(){
     free(poole.server_name);
