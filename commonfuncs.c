@@ -29,8 +29,7 @@ char * read_until(int fd, char end) {
 }
 
 void logn(char* x) {
-    char* x_new = NULL;
-    x_new = (char*) malloc(strlen(x)+1);
+	char* x_new = (char*) calloc(1, strlen(x)+1);
     strcat(x_new, x);
     strcat(x_new, "\n");
     log(x_new);

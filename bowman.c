@@ -188,6 +188,8 @@ void remove_ampersand(char* string){
 int main(int argc, char *argv[]){
 	int action = 0;
 	char* string = NULL;
+	const char* file_path_start = "config_files/";
+    char* file_path = NULL;
 	
 	signal(SIGINT, signal_manage);
 
@@ -196,7 +198,11 @@ int main(int argc, char *argv[]){
         return 0;
     }
 
-    int fd_config = open(argv[1], O_RDONLY);
+	file_path = (char*) malloc(sizeof(char) * (strlen(file_path_start) + strlen(argv[1]) - 1));
+    strcat(file_path, file_path_start);
+    strcat(file_path, argv[1]);
+
+    int fd_config = open(file_path, O_RDONLY);
     if (fd_config == -1){
         perror("Error: unable to open file\n");
         exit(EXIT_FAILURE);

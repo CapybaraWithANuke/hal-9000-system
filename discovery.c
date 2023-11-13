@@ -49,18 +49,13 @@ int main(int argc, char** argv) {
     }
 
     config.ip_poole = read_until(fd, '\n');
+
     buffer = read_until(fd, '\n');
     config.port_poole = atoi(buffer);
-    buffer[0] = '\0';
+    free(buffer);
     config.ip_bowman = read_until(fd, '\n');
     buffer = read_until(fd, '\n');
     config.port_bowman = atoi(buffer);
-
-
-    logn(config.ip_poole);
-    logni(config.port_poole);
-    logn(config.ip_bowman);
-    logni(config.port_bowman);
 
     free(config.ip_poole);
     free(config.ip_bowman);
