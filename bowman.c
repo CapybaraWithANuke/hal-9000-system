@@ -9,6 +9,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <stdlib.h>
+
+#include "commonfuncs.h"
 
 #define print(x, y) write(x, y, strlen(y));
 #define LOG_OUT -3
@@ -30,28 +33,6 @@ typedef struct{
 } Bowman;
 
 Bowman bowman;
-
-char * read_until(int fd, char end) {
-	char *string = NULL;
-	char c;
-	int i = 0, size;
-
-	while (1) {
-		size = read(fd, &c, sizeof(char));
-		if(string == NULL){
-			string = (char *) malloc(sizeof(char));
-		}
-		if(c != end && size > 0){
-			string = (char *) realloc(string, sizeof(char)*(i + 2));
-			string[i++] = c;
-		}
-		else{
-			break;
-		}
-	}
-	string[i] = '\0';
-	return string;
-}
 
 void free_everything(){
     free(bowman.user);
@@ -207,6 +188,8 @@ void remove_ampersand(char* string){
 int main(int argc, char *argv[]){
 	int action = 0;
 	char* string = NULL;
+	const char* file_path_start = "config_files/";
+    char* file_path = NULL;
 	
 	signal(SIGINT, signal_manage);
 
@@ -215,7 +198,11 @@ int main(int argc, char *argv[]){
         return 0;
     }
 
-    int fd_config = open(argv[1], O_RDONLY);
+	file_path = (char*) malloc(sizeof(char) * (strlen(file_path_start) + strlen(argv[1]) - 1));
+    strcat(file_path, file_path_start);
+    strcat(file_path, argv[1]);
+
+    int fd_config = open(file_path, O_RDONLY);
     if (fd_config == -1){
         perror("Error: unable to open file\n");
         exit(EXIT_FAILURE);

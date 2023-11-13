@@ -9,6 +9,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <stdlib.h>
+
+#include "commonfuncs.h"
 
 #define print(x) write(1, x, strlen(x));
 
@@ -23,28 +26,6 @@ typedef struct{
 
 Poole poole;
 
-char * read_until(int fd, char end) {
-	char *string = NULL;
-	char c;
-	int i = 0, size;
-
-	while (1) {
-		size = read(fd, &c, sizeof(char));
-		if(string == NULL){
-			string = (char *) malloc(sizeof(char));
-		}
-		if(c != end && size > 0){
-			string = (char *) realloc(string, sizeof(char)*(i + 2));
-			string[i++] = c;
-		}
-		else{
-			break;
-		}
-	}
-	string[i] = '\0';
-	return string;
-}
-
 void free_everything(){
     free(poole.server_name);
     free(poole.directory);
@@ -55,12 +36,19 @@ void free_everything(){
 int main(int argc, char *argv[]){
 	char* string;
 
+    const char* file_path_start = "config_files/";
+    char* file_path = NULL;
+
     if (argc != 2){
         print("Error: There must be exactly one parameter when running\n");
         return 0;
     }
 
-    int fd_config = open(argv[1], O_RDONLY);
+    file_path = (char*) malloc(sizeof(char) * (strlen(file_path_start) + strlen(argv[1]) - 1));
+    strcat(file_path, file_path_start);
+    strcat(file_path, argv[1]);
+
+    int fd_config = open(file_path, O_RDONLY);
     if (fd_config == -1){
         perror("Error: unable to open file\n");
         exit(EXIT_FAILURE);
