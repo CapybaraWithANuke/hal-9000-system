@@ -11,7 +11,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#include "commonfuncs.h"
+#include "../header/commonfuncs.h"
 
 #define print(x, y) write(x, y, strlen(y));
 #define LOG_OUT -3
@@ -188,7 +188,7 @@ void remove_ampersand(char* string){
 int main(int argc, char *argv[]){
 	int action = 0;
 	char* string = NULL;
-	const char* file_path_start = "config_files/";
+	const char* file_path_start = "config/";
     char* file_path = NULL;
 	
 	signal(SIGINT, signal_manage);

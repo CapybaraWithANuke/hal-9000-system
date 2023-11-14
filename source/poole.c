@@ -11,7 +11,7 @@
 #include <time.h>
 #include <stdlib.h>
 
-#include "commonfuncs.h"
+#include "../header/commonfuncs.h"
 
 #define print(x) write(1, x, strlen(x));
 
@@ -36,7 +36,7 @@ void free_everything(){
 int main(int argc, char *argv[]){
 	char* string;
 
-    const char* file_path_start = "config_files/";
+	const char* file_path_start = "config/";
     char* file_path = NULL;
 
     if (argc != 2){

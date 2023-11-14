@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <time.h>
 
-#include "commonfuncs.h"
+#include "../header/commonfuncs.h"
 
 #define ERR_ARGC "There should be exactly 1 argument."
 #define ERR_FD "Configuration file not found"
@@ -29,7 +29,7 @@ Config config;
 int main(int argc, char** argv) {
 
     int fd;
-    const char* file_path_start = "config_files/";
+	const char* file_path_start = "config/";
     char* file_path = NULL;
     char* buffer = NULL;
 
