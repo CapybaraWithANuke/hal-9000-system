@@ -6,6 +6,12 @@
 
 #define log(x) write(1, x, strlen(x))
 
+typedef struct {
+    char type;
+    char* header;
+    char* data;
+} Packet;
+
 char * read_until(int fd, char end) {
 	char *string = NULL;
 	char c;
@@ -42,3 +48,29 @@ void logni(int x) {
     log(buffer);
     free(buffer);
 }
+
+Packet read_packet(int fd) {
+	char* buffer;
+	Packet new_packet;
+	short header_length;
+	short data_length;
+	short i;
+
+	read(fd, &new_packet.type, sizeof(char));
+	read(fd, &header_length, sizeof(short));
+
+	new_packet.header = (char*) malloc(sizeof(char)*(header_length+1));
+	data_length = 256 - 3 - header_length;
+
+	for (i=0; i<header_length; i++){
+		read(fd, &new_packet.header[i], sizeof(char));
+	}
+	new_packet.header[i] = '\0';
+
+	for (i=0; i<data_length+1; i++){
+		read(fd, &new_packet.data[i], sizeof(char));
+	}
+	new_packet.data[i] = '\0';
+
+	return new_packet;
+} 
