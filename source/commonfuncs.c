@@ -34,6 +34,24 @@ char * read_until(int fd, char end) {
 	return string;
 }
 
+char** split(char* string, char character){
+	char** strings;
+	int i=0, j, k=0;
+
+	do {
+		strings = (char**) realloc(strings, sizeof(char*)*(i + 1));
+		strings[i] = (char*) malloc(sizeof(char));
+		for (j=0; string[k] != character && string[k] != '\0'; k++){
+
+			strings[i][j] = string[k];
+			strings[i] = (char*) realloc(strings[i], sizeof(char)*(j + 2));
+			j++;
+		}
+		i++;
+		k++;
+	} while (string[k-1] != '\0');
+}
+
 void logn(char* x) {
 	char* x_new = (char*) calloc(1, strlen(x)+1);
     strcat(x_new, x);
