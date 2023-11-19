@@ -13,13 +13,13 @@
 
 #include "../header/commonfuncs.h"
 
-#define ERR_ARGC "There should be exactly 1 argument."
-#define ERR_FD "Configuration file not found"
+#define ERR_ARGC "Error: there should be exactly 1 argument."
+#define ERR_FD "Error: configuration file not found"
 
-#define ERR_SOCKET "Socket not created"
-#define ERR_BIND "Binding failed"
-#define ERR_LISTEN "Listening failed"
-#define ERR_ACCEPT "Accepting failed"
+#define ERR_SOCKET "Error: socket not created"
+#define ERR_BIND "Error: binding failed"
+#define ERR_LISTEN "Error: listening failed"
+#define ERR_ACCEPT "Error: accepting failed"
 
 #define ERR -1
 
@@ -161,10 +161,14 @@ int main (int argc, char** argv) {
     }
 
     config.ip_poole = read_until(file_fd, '\n');
+    config.ip_poole = read_until(file_fd, '\n');
 
+    buffer = read_until(file_fd, '\n');
     buffer = read_until(file_fd, '\n');
     config.port_poole = atoi(buffer);
     free(buffer);
+    config.ip_bowman = read_until(file_fd, '\n');
+    buffer = read_until(file_fd, '\n');
     config.ip_bowman = read_until(file_fd, '\n');
     buffer = read_until(file_fd, '\n');
     config.port_bowman = atoi(buffer);
