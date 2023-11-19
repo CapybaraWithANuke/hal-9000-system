@@ -19,6 +19,9 @@
 
 #define ERR_SOCKET "Error: socket not created"
 #define ERR_CONNECT "Error: connection not established"
+#define ERR_BIND "Error: binding failed"
+#define ERR_LISTEN "Error: listening failed"
+#define ERR_ACCEPT "Error: accepting failed"
 
 #define ERR -1
 
@@ -40,12 +43,42 @@ void free_everything(){
     free(poole.poole_ip);
 }
 
+int setupSocket(char* ip, int port, int server_fd) {
+
+    struct sockaddr_in address;
+    socklen_t addrlen;
+    int socket_fd = -1;
+
+    address.sin_family = AF_INET;
+    address.sin_port = htons(port);
+    address.sin_addr.s_addr = inet_addr(ip);
+    addrlen = sizeof(address);
+
+    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+        logn(ERR_BIND);
+        return ERR;
+    }
+
+    if (listen(server_fd, 5) < 0) {
+        logn(ERR_LISTEN);
+        return ERR;
+    }
+
+    if ((socket_fd = accept(server_fd, (struct sockaddr*)&address, &addrlen)) < 0) {
+        logn(ERR_ACCEPT);
+        return ERR;
+    }
+
+    return socket_fd;
+
+}
+
 int main(int argc, char *argv[]){
 	
     char* string;
 	const char* file_path_start = "config/";
     char* file_path = NULL;
-    int server_fd = -1;
+    int discovery_fd = -1;
     struct sockaddr_in serv_addr;
 
     if (argc != 2){
@@ -75,9 +108,13 @@ int main(int argc, char *argv[]){
     free(string);
     close(fd_config);
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (server_fd < 0) {
+
+
+
+    discovery_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (discovery_fd < 0) {
         logn(ERR_SOCKET);
         return ERR;
     }
@@ -86,12 +123,61 @@ int main(int argc, char *argv[]){
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(poole.discovery_port);
 
-    if (connect(server_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (connect(discovery_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         logn(ERR_CONNECT);
         return ERR;
     }
 
+    char* frame_data = calloc(1, sizeof(char));
+    strcat(frame_data, poole.server_name);
+    strcat(frame_data, '&');
+    strcat(frame_data, poole.poole_ip);
+    strcat(frame_data, '&');
+    strcat(frame_data, poole.poole_port);
     
+
+    char* frame = buildFrame(1, strlen("NEW_POOLE"), "NEW_POOLE", frame_data);
+
+    free(frame_data);
+
+    write(discovery_fd, frame, 256);
+    Packet packet = read_packet(discovery_fd);
+
+    while (packet.header[4] == 'K') {
+        char* frame_data = calloc(1, sizeof(char));
+        strcat(frame_data, poole.server_name);
+        strcat(frame_data, '&');
+        strcat(frame_data, poole.poole_ip);
+        strcat(frame_data, '&');
+        strcat(frame_data, poole.poole_port);
+        
+
+        char* frame = buildFrame(1, strlen("NEW_POOLE"), "NEW_POOLE", frame_data);
+
+        free(frame_data);
+
+        write(discovery_fd, frame, 256);
+        Packet packet = read_packet(discovery_fd);
+    }
+
+    close(discovery_fd);
+
+
+
+
+
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    
+    if (server_fd < 0) {
+        logn(ERR_SOCKET);
+        return ERR;
+    }
+
+    int socket_fd = setupSocket(poole.poole_ip, poole.poole_port, server_fd);
+
+    
+    
+
 
     free_everything();
 	

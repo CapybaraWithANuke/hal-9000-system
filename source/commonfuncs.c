@@ -93,3 +93,23 @@ Packet read_packet(int fd) {
 
 	return new_packet;
 } 
+
+char* buildFrame(char type, int header_length, char* header, char* data) {
+
+	char* frame = (char*) calloc(1, sizeof(char));
+
+	strcat(frame, type);
+
+	char* length = (header_length / 10 == 0) ? ((char*) malloc(sizeof(char) * 2)) : ((char*) malloc(sizeof(char) * 3));
+	asprintf(&length, "%d", header_length);
+	
+	strcat(frame, length);
+
+	free(length);
+
+	strcat(frame, header);
+	strcat(frame, data);
+
+	return frame;
+
+}
