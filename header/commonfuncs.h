@@ -14,5 +14,6 @@ void logn(char* x);
 void logni(int x);
 char** split(char* string, char character);
 Packet read_packet(int fd);
+void debug(char* x);
 
 #endif
