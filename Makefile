@@ -1,4 +1,4 @@
-all: Discovery Bowman #Poole 
+all: Bowman Discovery  #Poole 
 CFLAGS =-Wall -Wextra -g
 
 bowman.o: source/bowman.c

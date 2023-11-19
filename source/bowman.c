@@ -1,15 +1,21 @@
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-#include <fcntl.h>
-#include <errno.h>
 #include <time.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <ctype.h>
+#include <netdb.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <signal.h>
+#include <poll.h>
+#include <arpa/inet.h>
+#include <ctype.h>
 #include <stdlib.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <math.h>
 
 #include "../header/commonfuncs.h"
 
@@ -166,7 +172,7 @@ void remove_ampersand(char* string){
     string[i1] = '\0';
 }
 
-int connect() {
+int system_connect() {
 
 	struct sockaddr_in server;
 	char* buffer;
@@ -290,7 +296,7 @@ int main(int argc, char *argv[]){
 			}
 			switch (command){
 				case CONNECT :
-					server_fd = connect();
+					server_fd = system_connect();
 					break;
 				case LOGOUT :
 					break;
@@ -307,7 +313,7 @@ int main(int argc, char *argv[]){
 			}
 		}
 	}
-	free_everything();
+	leave();
 	
     return 0;
 }
