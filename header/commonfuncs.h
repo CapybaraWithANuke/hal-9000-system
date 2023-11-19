@@ -13,5 +13,8 @@ typedef struct {
 char * read_until(int fd, char end);
 void logn(char* x);
 void logni(int x);
+Packet read_packet(int fd);
+char* buildFrame(char type, int header_length, char* header, char* data);
+char** split(char* string, char character);
 
 #endif
