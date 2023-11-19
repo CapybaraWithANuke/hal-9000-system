@@ -39,7 +39,25 @@ typedef struct {
 
 int* poole_fds;
 int* bowman_fds;
+int num_poole_fds = 1;
+int num_bowman_fds = 1;
 Poole* poole_connections;
+
+void leave(int signum){
+    
+    if (signum == SIGINT){
+
+        close(bowman_fds);
+        close(poole_fds);
+
+        for (i=0; i<num_poole_fds; i++){
+            free(poole_connections[i].name);
+            free(poole_connections[i].ip);
+            free(poole_connections[i].port);
+        }
+        free(poole_connections);
+    }
+}
 
 int setupSocket (char* ip, int port, int server_fd) {
 
@@ -87,6 +105,9 @@ void poole_request(int fd,int pos) {
     poole_connections[pos].name = strings[0];
     poole_connections[pos].ip = strings[1];
     poole_connections[pos].port = strings[2];
+
+    free(packet.header);
+    free(packet.data);
 }
 
 void send_accept_error(int fd) {
@@ -97,7 +118,7 @@ void send_poole_accept(int fd) {
     send_packet(fd, 1, "CON_OK", "");
 }
 
-int redirect_bowman(int fd, int pos, int num_poole_fds, int num_bowman_fds) {
+void redirect_bowman(int fd, int pos) {
 
     int lowest = 2147483647;
     int lowest_index = 0;
@@ -127,10 +148,9 @@ int redirect_bowman(int fd, int pos, int num_poole_fds, int num_bowman_fds) {
     else {
         send_accept_error(fd);
     }
-    return num_bowman_fds;
 }
 
-int process_requests (int* fds, int num_fds, fd_set set, int bowman_npoole, int num_poole_fds) {
+void process_requests (int* fds, int num_fds, fd_set set, int bowman_npoole) {
 
     int i, aux;
 
@@ -147,12 +167,8 @@ int process_requests (int* fds, int num_fds, fd_set set, int bowman_npoole, int 
                     FD_SET(fds[num_fds], &set);
                     num_fds++;
 
-                    if (bowman_npoole) {
-                        num_fds = redirect_bowman(aux, num_fds-1, num_poole_fds, num_fds);
-                    }
-                    else {
+                    if (!bowman_npoole) {
                         poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(num_fds));
-                        send_poole_accept(aux);
                     }
                 }
                 else if (bowman_npoole) {
@@ -167,16 +183,16 @@ int process_requests (int* fds, int num_fds, fd_set set, int bowman_npoole, int 
             else {
                 if (!bowman_npoole){
                     poole_request(fds[i], i);
+                    send_poole_accept(fds[i]);
                     debug("Received poole request\n");
                 }
                 else {
-                    //bowman_request(fds[i], num_fds, set);
+                    redirect_bowman(fds[i], num_fds-1);
                 }
             }
         }
     }
 
-    return num_fds;
 }
 
 int main (int argc, char** argv) {
@@ -188,7 +204,6 @@ int main (int argc, char** argv) {
     char* buffer = NULL;
     fd_set poole_set;
     fd_set bowman_set;
-    int num_poole_fds = 1, num_bowman_fds = 1;
 
     if (argc != 2) {
         logn(ERR_ARGC);
@@ -219,6 +234,7 @@ int main (int argc, char** argv) {
     config.port_bowman = atoi(buffer);
     close(file_fd);
     free(file_path);
+    free(buffer);
 
     poole_fds = (int*) malloc(sizeof(int));
     bowman_fds = (int*) malloc(sizeof(int));
@@ -228,6 +244,10 @@ int main (int argc, char** argv) {
 
     poole_fds[0] = setupSocket(config.ip_poole, config.port_poole, poole_fds[0]);
     bowman_fds[0] = setupSocket(config.ip_bowman, config.port_bowman, poole_fds[0]);
+    free(config.ip_poole);
+    free(config.ip_bowman);
+
+    signal(SIGINT, leave);
 
     if (poole_fds[0] == -1 || bowman_fds[0] == -1) {
         return ERR;
@@ -241,11 +261,6 @@ int main (int argc, char** argv) {
         num_poole_fds = process_requests(poole_fds, num_poole_fds, poole_set, 0, num_poole_fds);
         num_bowman_fds = process_requests(bowman_fds, num_bowman_fds, bowman_set, 1, num_poole_fds);
     }
-
-    free(config.ip_poole);
-    free(config.ip_bowman);
-    free(buffer);
-    //close(server_poole_fd); close(server_bowman_fd);
 
     return 0;
 

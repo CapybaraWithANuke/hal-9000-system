@@ -110,7 +110,7 @@ void send_packet(int fd, int type, char* header, char*data) {
 
     int data_length = 256 - 3 - packet.header_length;
     packet.data = (char*) malloc(sizeof(char)*data_length);
-    fil_with('\0', packet.data, data_length);
+    fill_with('\0', packet.data, data_length);
 	strcpy(packet.data, data);
 
 	asprintf(&buffer, "%c%hd%s", packet.type, packet.header_length, packet.header);
@@ -121,9 +121,12 @@ void send_packet(int fd, int type, char* header, char*data) {
 	}
 
 	write(fd, buffer, 256);
+	free(packet.header);
+	free(packet.data);
+	free(buffer);
 }
 
-void fil_with(char symbol, char* data, int size) {
+void fill_with(char symbol, char* data, int size) {
 
 	for (int i=0; i<size; i++){
 		data[i] = symbol;

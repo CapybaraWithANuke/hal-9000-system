@@ -16,7 +16,7 @@ void logn(char* x);
 void logni(int x);
 Packet read_packet(int fd);
 void debug(char* x);
-void fil_with(char symbol, char* data, int size);
+void fill_with(char symbol, char* data, int size);
 void send_packet(int fd, int type, char* header, char*data);
 char* buildFrame(char type, int header_length, char* header, char* data);
 char** split(char* string, char character);
