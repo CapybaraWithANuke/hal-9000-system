@@ -29,19 +29,21 @@ typedef struct{
 	char* user; 
 	char* directory;
 	char* ip;
-	int port;
-} Bowman;
+	char* port;
+} Config;
 
-Bowman bowman;
+int server_fd = -1;
+Config config;
 
-void free_everything(){
-    free(bowman.user);
-    free(bowman.directory);
-    free(bowman.ip);
-}
+void leave(){
 
-void signal_manage(__attribute__((unused)) int signum){
-	free_everything();
+    free(config.user);
+    free(config.directory);
+    free(config.ip);
+	free(config.port);
+	if (server_fd > 0){
+		close(server_fd);
+	}
 	exit (0);
 }
 
@@ -84,27 +86,6 @@ int check_argument(int* i, int command,  char* string){
 		}
 	}
 
-}
-
-int process_argument(int command){
-	switch (command){
-		case CONNECT :
-			break;
-		case LOGOUT :
-			return LOG_OUT;
-			break;
-		case DOWNLOAD :
-			break;
-		case LIST_SONGS :
-			break;
-		case LIST_PLAYLISTS :
-			break;
-		case CHECK_DOWNLOADS :
-			break;
-		case CLEAR_DOWNLOADS :
-			break;
-	}
-	return command;
 }
 
 int check_command(char* string){
@@ -155,7 +136,7 @@ int check_command(char* string){
 							}
 							action = check_argument(&i, j, string);
 							if (action >= 0){
-								return process_argument(j);
+								return j;
 							}
 							return action;
 						}
@@ -185,13 +166,84 @@ void remove_ampersand(char* string){
     string[i1] = '\0';
 }
 
+int connect() {
+
+	struct sockaddr_in server;
+	char* buffer;
+
+	bzero(&server, sizeof(server));
+    server.sin_family = AF_INET;
+    server.sin_port = htons(atoi(config.port));
+	
+    if(inet_pton(AF_INET, config.ip, &server.sin_addr) < 0) {
+        print(2, "Error connecting to the server\n");
+        return -1;
+    }
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+        print(2, "Error connecting to the server\n");
+        return -1;
+    }
+    if(connect(server_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
+        print(2, "Error connecting to the server\n");
+        close(server_fd);
+        return -1;
+    }
+	send_packet(server_fd, 1, "NEW_BOWMAN", config.user);
+
+
+	Packet packet = read_packet(server_fd);
+
+	if (!strcmp(packet.header,"CON_OK")) {
+		char** strings = split(packet.data, '&');
+		close(server_fd);
+		free(packet.header);
+		free(packet.data);
+
+		bzero(&server, sizeof(server));
+		server.sin_family = AF_INET;
+		server.sin_port = htons(atoi(strings[2]));
+		
+		if(inet_pton(AF_INET, strings[1], &server.sin_addr) < 0) {
+			print(2, "Error connecting to the server\n");
+			return -1;
+		}
+		if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+			print(2, "Error connecting to the server\n");
+			return -1;
+		}
+		if(connect(server_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
+			print(2, "Error connecting to the server\n");
+			close(server_fd);
+			return -1;
+		}
+		send_packet(server_fd, 1, "NEW_BOWMAN", config.user);
+
+		Packet packet = read_packet(server_fd);
+
+		if (!strcmp(packet.header,"CON_OK")) {
+			free(packet.header);
+			free(packet.data);
+			
+			asprintf(&buffer, "%s connected to HAL 9000 system, welcome music lover!", config.user);
+			logn(buffer);
+			free(buffer);
+			return server_fd;
+		}
+	}
+	free(packet.header);
+	free(packet.data);
+	print(2, "Error connecting to the server\n");
+	return -1;
+}
+
 int main(int argc, char *argv[]){
-	int action = 0;
+	int command = 0;
 	char* string = NULL;
 	const char* file_path_start = "config/";
     char* file_path = NULL;
+	int server_fd = -1;
 	
-	signal(SIGINT, signal_manage);
+	signal(SIGINT, leave);
 
     if (argc != 2){
         print(2, "Error: There must be exactly one parameter when running\n");
@@ -208,30 +260,51 @@ int main(int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-	bowman.user = read_until(fd_config, '\n');
-    remove_ampersand(bowman.user);
+	config.user = read_until(fd_config, '\n');
+    remove_ampersand(config.user);
 
-	bowman.directory = read_until(fd_config, '\n');
-	bowman.ip = read_until(fd_config, '\n');
-	string = read_until(fd_config, '\n');
-	bowman.port = atoi(string);
-	free(string);
+	config.directory = read_until(fd_config, '\n');
+	config.ip = read_until(fd_config, '\n');
+	config.port = read_until(fd_config, '\n');
 	close(fd_config);
 
-	asprintf(&string, "%s user has been initialized\n\n", bowman.user);
+	asprintf(&string, "%s user has been initialized\n\n", config.user);
 	print(1, string);
 	free(string);
 
-	while (action != LOG_OUT){
+	while (command != LOG_OUT){
 		print(1, "$ ");
 		string = read_until(0, '\n');
-		action = check_command(string);
+		command = check_command(string);
 		free(string);
-		if (action == INVALID_COMMAND){
+		if (command == INVALID_COMMAND){
 			print(2, "ERROR: Please input a valid command.\n");
 		}
-		else if (action == UNKNOWN_COMMAND){
+		else if (command == UNKNOWN_COMMAND){
 			print(2, "Unknown command.\n");
+		}
+		else {
+			if (command == CONNECT && server_fd > 0){
+				logn("Already connected");
+				command = 10;
+			}
+			switch (command){
+				case CONNECT :
+					server_fd = connect();
+					break;
+				case LOGOUT :
+					break;
+				case DOWNLOAD :
+					break;
+				case LIST_SONGS :
+					break;
+				case LIST_PLAYLISTS :
+					break;
+				case CHECK_DOWNLOADS :
+					break;
+				case CLEAR_DOWNLOADS :
+					break;
+			}
 		}
 	}
 	free_everything();
