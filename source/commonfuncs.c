@@ -27,7 +27,7 @@ char * read_until(int fd, char end) {
 	return string;
 }
 
-char** split(char* string, char character){
+char** split(char* string, char character) {
 	char** strings;
 	int i=0, j, k=0;
 
@@ -40,6 +40,7 @@ char** split(char* string, char character){
 			strings[i] = (char*) realloc(strings[i], sizeof(char)*(j + 2));
 			j++;
 		}
+		strings[i][j] = '\0';
 		i++;
 		k++;
 	} while (string[k-1] != '\0');
@@ -72,17 +73,16 @@ void logni(int x) {
 
 Packet read_packet(int fd) {
 	Packet new_packet;
-	short header_length;
 	short data_length;
 	short i;
 
 	read(fd, &new_packet.type, sizeof(char));
-	read(fd, &header_length, sizeof(short));
+	read(fd, &new_packet.header_length, sizeof(short));
 
-	new_packet.header = (char*) malloc(sizeof(char)*(header_length+1));
-	data_length = 256 - 3 - header_length;
+	new_packet.header = (char*) malloc(sizeof(char)*(new_packet.header_length+1));
+	data_length = 256 - 3 - new_packet.header_length;
 
-	for (i=0; i<header_length; i++){
+	for (i=0; i<new_packet.header_length; i++){
 		read(fd, &new_packet.header[i], sizeof(char));
 	}
 	new_packet.header[i] = '\0';
@@ -93,4 +93,38 @@ Packet read_packet(int fd) {
 	new_packet.data[i] = '\0';
 
 	return new_packet;
-} 
+}
+
+void send_packet(int fd, int type, char* header, char*data) {
+
+    Packet packet;
+	char* buffer;
+	int i, j=0;
+
+    packet.type = (char) type;
+    packet.header_length = strlen(header);
+
+    packet.header = (char*) malloc(sizeof(char)*(packet.header_length+1));
+	strcpy(packet.header, header);
+
+    int data_length = 256 - 3 - packet.header_length;
+    packet.data = (char*) malloc(sizeof(char)*data_length);
+    fil_with('\0', packet.data, data_length);
+	strcpy(packet.data, data);
+
+	asprintf(&buffer, "%c%hd%s", packet.type, packet.header_length, packet.header);
+	for (i=256-data_length; i<256; i++) {
+		buffer = (char*) realloc(buffer, sizeof(char)*(i+1));
+		buffer[i] = packet.data[j];
+		j++;
+	}
+
+	write(fd, buffer, 256);
+}
+
+void fil_with(char symbol, char* data, int size) {
+
+	for (int i=0; i<size; i++){
+		data[i] = symbol;
+	}
+}
