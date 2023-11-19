@@ -187,6 +187,8 @@ int main (int argc, char** argv) {
     if (poole_fds[0] == -1 || bowman_fds[0] == -1) {
         return ERR;
     }
+    FD_ZERO(&poole_set);
+    FD_ZERO(&bowman_set);
     FD_SET(poole_fds[0],&poole_set);
     FD_SET(bowman_fds[0],&bowman_set);
 
