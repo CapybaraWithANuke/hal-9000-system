@@ -3,14 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-
-#define log(x) write(1, x, strlen(x))
-
-typedef struct {
-    char type;
-    char* header;
-    char* data;
-} Packet;
+#include "../header/commonfuncs.h"
 
 char * read_until(int fd, char end) {
 	char *string = NULL;
@@ -50,9 +43,19 @@ char** split(char* string, char character){
 		i++;
 		k++;
 	} while (string[k-1] != '\0');
+
+	return strings;
 }
 
 void logn(char* x) {
+	char* x_new = (char*) calloc(1, strlen(x)+1);
+    strcat(x_new, x);
+    strcat(x_new, "\n");
+    log(x_new);
+    free(x_new);
+}
+
+void debug(char* x) {
 	char* x_new = (char*) calloc(1, strlen(x)+1);
     strcat(x_new, x);
     strcat(x_new, "\n");
@@ -68,7 +71,6 @@ void logni(int x) {
 }
 
 Packet read_packet(int fd) {
-	char* buffer;
 	Packet new_packet;
 	short header_length;
 	short data_length;
