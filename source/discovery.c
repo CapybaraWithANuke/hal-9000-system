@@ -23,8 +23,6 @@
 
 #define ERR -1
 
-#define print(x) write(1, x, strlen(x))
-
 typedef struct {
     char* ip_poole;
     int port_poole;
