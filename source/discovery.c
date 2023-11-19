@@ -47,10 +47,10 @@ void leave(int signum){
     
     if (signum == SIGINT){
 
-        close(bowman_fds);
-        close(poole_fds);
+        free(bowman_fds);
+        free(poole_fds);
 
-        for (i=0; i<num_poole_fds; i++){
+        for (int i=0; i<num_poole_fds; i++){
             free(poole_connections[i].name);
             free(poole_connections[i].ip);
             free(poole_connections[i].port);
@@ -258,8 +258,8 @@ int main (int argc, char** argv) {
     FD_SET(bowman_fds[0],&bowman_set);
 
     while (1) {
-        num_poole_fds = process_requests(poole_fds, num_poole_fds, poole_set, 0, num_poole_fds);
-        num_bowman_fds = process_requests(bowman_fds, num_bowman_fds, bowman_set, 1, num_poole_fds);
+        process_requests(poole_fds, num_poole_fds, poole_set, 0);
+        process_requests(bowman_fds, num_bowman_fds, bowman_set, 1);
     }
 
     return 0;
