@@ -13,13 +13,13 @@
 
 #include "../header/commonfuncs.h"
 
-#define ERR_ARGC "There should be exactly 1 argument."
-#define ERR_FD "Configuration file not found"
+#define ERR_ARGC "Error: there should be exactly 1 argument."
+#define ERR_FD "Error: configuration file not found"
 
-#define ERR_SOCKET "Socket not created"
-#define ERR_BIND "Binding failed"
-#define ERR_LISTEN "Listening failed"
-#define ERR_ACCEPT "Accepting failed"
+#define ERR_SOCKET "Error: socket not created"
+#define ERR_BIND "Error: binding failed"
+#define ERR_LISTEN "Error: listening failed"
+#define ERR_ACCEPT "Error: accepting failed"
 
 #define ERR -1
 
@@ -42,9 +42,8 @@ int setupSocket (char* ip, int port, int server_fd) {
     int socket_fd = -1;
     
 
-    logn("aboba");
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    logn("bebra");
+    
     if (server_fd < 0) {
         logn(ERR_SOCKET);
         return ERR;
@@ -136,13 +135,13 @@ int main (int argc, char** argv) {
         return ERR;
     }
 
-    config.ip_poole = read_until(fd, '\n');
+    config.ip_poole = read_until(file_fd, '\n');
 
-    buffer = read_until(fd, '\n');
+    buffer = read_until(file_fd, '\n');
     config.port_poole = atoi(buffer);
     free(buffer);
-    config.ip_bowman = read_until(fd, '\n');
-    buffer = read_until(fd, '\n');
+    config.ip_bowman = read_until(file_fd, '\n');
+    buffer = read_until(file_fd, '\n');
     config.port_bowman = atoi(buffer);
     close(file_fd);
     free(file_path);
@@ -169,7 +168,6 @@ int main (int argc, char** argv) {
     free(config.ip_poole);
     free(config.ip_bowman);
     free(buffer);
-    close(server_poole_fd); close(server_bowman_fd);
 
     return 0;
 

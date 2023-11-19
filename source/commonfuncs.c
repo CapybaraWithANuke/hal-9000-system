@@ -50,6 +50,8 @@ char** split(char* string, char character){
 		i++;
 		k++;
 	} while (string[k-1] != '\0');
+
+	return strings;
 }
 
 void logn(char* x) {
@@ -68,7 +70,6 @@ void logni(int x) {
 }
 
 Packet read_packet(int fd) {
-	char* buffer;
 	Packet new_packet;
 	short header_length;
 	short data_length;

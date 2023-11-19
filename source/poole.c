@@ -10,10 +10,17 @@
 #include <errno.h>
 #include <time.h>
 #include <stdlib.h>
+#include <arpa/inet.h>
+
 
 #include "../header/commonfuncs.h"
 
 #define print(x) write(1, x, strlen(x));
+
+#define ERR_SOCKET "Error: socket not created"
+#define ERR_CONNECT "Error: connection not established"
+
+#define ERR -1
 
 typedef struct{
 	char* server_name; 
@@ -34,10 +41,12 @@ void free_everything(){
 }
 
 int main(int argc, char *argv[]){
-	char* string;
-
+	
+    char* string;
 	const char* file_path_start = "config/";
     char* file_path = NULL;
+    int server_fd = -1;
+    struct sockaddr_in serv_addr;
 
     if (argc != 2){
         print("Error: There must be exactly one parameter when running\n");
@@ -65,6 +74,24 @@ int main(int argc, char *argv[]){
 	poole.poole_port = atoi(string);
     free(string);
     close(fd_config);
+
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (server_fd < 0) {
+        logn(ERR_SOCKET);
+        return ERR;
+    }
+
+    serv_addr.sin_addr.s_addr = inet_addr(poole.discovery_ip);
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(poole.discovery_port);
+
+    if (connect(server_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+        logn(ERR_CONNECT);
+        return ERR;
+    }
+
+    
 
     free_everything();
 	
