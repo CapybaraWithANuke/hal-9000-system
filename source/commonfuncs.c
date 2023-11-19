@@ -93,6 +93,7 @@ Packet read_packet(int fd) {
 	new_packet.data[i] = '\0';
 
 	return new_packet;
+
 }
 
 void send_packet(int fd, int type, char* header, char*data) {
