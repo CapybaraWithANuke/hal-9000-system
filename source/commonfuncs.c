@@ -77,9 +77,11 @@ Packet read_packet(int fd) {
 	short i;
 
 	read(fd, &new_packet.type, sizeof(char));
-	read(fd, &new_packet.header_length, sizeof(short));
+	read(fd, &new_packet.empty, sizeof(char));
+	read(fd, &new_packet.empty, sizeof(char));
+	new_packet.header_length = (int) new_packet.empty;
 
-	new_packet.header = (char*) malloc(sizeof(char)*(new_packet.header_length+1));
+	new_packet.header = (char*) malloc(sizeof(char)*(new_packet.header_length));
 	data_length = 256 - 3 - new_packet.header_length;
 
 	for (i=0; i<new_packet.header_length; i++){
@@ -87,10 +89,10 @@ Packet read_packet(int fd) {
 	}
 	new_packet.header[i] = '\0';
 
-	for (i=0; i<data_length+1; i++){
+	for (i=0; i<data_length; i++){
 		read(fd, &new_packet.data[i], sizeof(char));
 	}
-	new_packet.data[i] = '\0';
+	new_packet.data[i-1] = '\0';
 
 	return new_packet;
 
@@ -99,11 +101,10 @@ Packet read_packet(int fd) {
 void send_packet(int fd, int type, char* header, char*data) {
 
     Packet packet;
-	char* buffer;
-	int i, j=0;
+	char aux;
 
     packet.type = (char) type;
-    packet.header_length = strlen(header);
+    packet.header_length = strlen(header)+1;
 
     packet.header = (char*) malloc(sizeof(char)*(packet.header_length+1));
 	strcpy(packet.header, header);
@@ -113,17 +114,16 @@ void send_packet(int fd, int type, char* header, char*data) {
     fill_with('\0', packet.data, data_length);
 	strcpy(packet.data, data);
 
-	asprintf(&buffer, "%c%hd%s", packet.type, packet.header_length, packet.header);
-	for (i=256-data_length; i<256; i++) {
-		buffer = (char*) realloc(buffer, sizeof(char)*(i+1));
-		buffer[i] = packet.data[j];
-		j++;
-	}
+	write(fd, packet.data, sizeof(char));
+	aux = (char) 0;
+	write(fd, &aux, sizeof(char));
+	aux = (char) packet.header_length;
+	write(fd, &aux, sizeof(char));
+	write(fd, packet.header, sizeof(char)*packet.header_length);
+	write(fd, packet.data, sizeof(char)*data_length);
 
-	write(fd, buffer, 256);
 	free(packet.header);
 	free(packet.data);
-	free(buffer);
 }
 
 void fill_with(char symbol, char* data, int size) {
