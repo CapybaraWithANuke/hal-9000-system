@@ -47,14 +47,13 @@ int setupSocket(char* ip, int port, int server_fd) {
 
     struct sockaddr_in address;
     socklen_t addrlen;
-    int socket_fd = -1;
 
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
     address.sin_addr.s_addr = inet_addr(ip);
     addrlen = sizeof(address);
 
-    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
+    if (bind(server_fd, (struct sockaddr*)&address, addrlen) < 0) {
         logn(ERR_BIND);
         return ERR;
     }
@@ -64,12 +63,7 @@ int setupSocket(char* ip, int port, int server_fd) {
         return ERR;
     }
 
-    if ((socket_fd = accept(server_fd, (struct sockaddr*)&address, &addrlen)) < 0) {
-        logn(ERR_ACCEPT);
-        return ERR;
-    }
-
-    return socket_fd;
+    return 1;
 
 }
 
@@ -128,36 +122,39 @@ int main(int argc, char *argv[]){
         return ERR;
     }
 
-    char* frame_data = calloc(1, sizeof(char));
+    char* frame_data = calloc(2, sizeof(char));
     strcat(frame_data, poole.server_name);
-    strcat(frame_data, '&');
+    strcat(frame_data, "&");
     strcat(frame_data, poole.poole_ip);
-    strcat(frame_data, '&');
-    strcat(frame_data, poole.poole_port);
+    strcat(frame_data, "&");
+    char* buffer;
+    asprintf(&buffer, "%d", poole.poole_port);
+    strcat(frame_data, buffer);
+    free(buffer);
     
 
-    char* frame = buildFrame(1, strlen("NEW_POOLE"), "NEW_POOLE", frame_data);
+    send_packet(discovery_fd, 1, "NEW_POOLE", frame_data);
 
     free(frame_data);
 
-    write(discovery_fd, frame, 256);
     Packet packet = read_packet(discovery_fd);
 
     while (packet.header[4] == 'K') {
-        char* frame_data = calloc(1, sizeof(char));
+        char* frame_data = calloc(2, sizeof(char));
         strcat(frame_data, poole.server_name);
-        strcat(frame_data, '&');
+        strcat(frame_data, "&");
         strcat(frame_data, poole.poole_ip);
-        strcat(frame_data, '&');
-        strcat(frame_data, poole.poole_port);
+        strcat(frame_data, "&");
+        char* buffer;
+        asprintf(&buffer, "%d", poole.poole_port);
+        strcat(frame_data, buffer);
+        free(buffer);
         
-
-        char* frame = buildFrame(1, strlen("NEW_POOLE"), "NEW_POOLE", frame_data);
+        send_packet(discovery_fd, 1, "NEW_POOLE", frame_data);
 
         free(frame_data);
 
-        write(discovery_fd, frame, 256);
-        Packet packet = read_packet(discovery_fd);
+        packet = read_packet(discovery_fd);
     }
 
     close(discovery_fd);
@@ -173,10 +170,69 @@ int main(int argc, char *argv[]){
         return ERR;
     }
 
-    int socket_fd = setupSocket(poole.poole_ip, poole.poole_port, server_fd);
+    struct sockaddr_in address;
+    socklen_t addrlen;
 
-    
-    
+    address.sin_family = AF_INET;
+    address.sin_port = htons(poole.poole_port);
+    address.sin_addr.s_addr = inet_addr(poole.poole_ip);
+    addrlen = sizeof(address);
+
+    fd_set set;
+    FD_ZERO(&set);
+    FD_SET(server_fd, &set);
+    int* sockets_fd = (int*) malloc(sizeof(int));
+    char** names_bowmans = (char**) malloc(sizeof(char*));
+    int sockets_index = 0;
+    int nfds = server_fd+1;
+
+    setupSocket(poole.poole_ip, poole.poole_port, server_fd);
+
+    while(69) {
+
+        fd_set set2 = set;
+        select(nfds, &set, NULL, NULL, NULL);
+
+        if (FD_ISSET(server_fd, &set2)) {
+            if ((sockets_fd[sockets_index] = accept(server_fd, (struct sockaddr*)&address, &addrlen)) < 0) {
+                logn(ERR_ACCEPT);
+                return ERR;
+            }
+            FD_SET(sockets_fd[sockets_index], &set);
+            ++sockets_index;
+            sockets_fd = (int*) realloc(sockets_fd, sizeof(int)*(sockets_index + 1));
+            FD_SET(server_fd, &set);
+            
+        }
+
+        else {
+
+            for (int i = 0; i <= sockets_index; ++i) {
+
+                if (FD_ISSET(sockets_fd[sockets_index], &set2)) {
+                    
+                    Packet packet = read_packet(sockets_fd[sockets_index]);
+                    logn(packet.data);
+
+                    switch(packet.type) {
+
+                        case '1':
+                            strcpy(names_bowmans[sockets_index], packet.data);
+
+                    }
+
+
+                }
+
+            }
+
+
+
+        }
+
+    }
+
+
 
 
     free_everything();
