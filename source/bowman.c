@@ -159,11 +159,11 @@ int check_command(char* string){
 	return INVALID_COMMAND;
 }
 
-void remove_ampersand(char* string){
+void remove_symbol(char* string, char symbol){
 	int i1 = 0, i2 = 0;
 	while (string[i2] != '\0'){
         
-        if (string[i2] != '&'){
+        if (string[i2] != symbol){
             string[i1] = string[i2];
             i1++;
         }
@@ -180,22 +180,33 @@ int system_connect() {
 	bzero(&server, sizeof(server));
     server.sin_family = AF_INET;
     server.sin_port = htons(atoi(config.port));
-	
     if(inet_pton(AF_INET, config.ip, &server.sin_addr) < 0) {
         print(2, "Error connecting to the server\n");
+		debug("GVHBJNKMNB ");
         return -1;
     }
+	/*debug(config.port);
+	asprintf(&buffer, ".%s. %s.", config.port, config.ip);
+	debug(buffer);
+	free(buffer);*/
     if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         print(2, "Error connecting to the server\n");
+		debug("OHMYGOF");
         return -1;
     }
     if(connect(server_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
         print(2, "Error connecting to the server\n");
+		debug("HEÑÑ=");
+		debug(config.port);
+		print(1, config.port);
+		print(1, "sddsdds");
+		asprintf(&buffer, "%s...%s", config.ip, config.port);
+		debug(buffer);
+		free(buffer);
         close(server_fd);
         return -1;
     }
 	send_packet(server_fd, 1, "NEW_BOWMAN", config.user);
-
 
 	Packet packet = read_packet(server_fd);
 
@@ -267,11 +278,14 @@ int main(int argc, char *argv[]){
     }
 
 	config.user = read_until(fd_config, '\n');
-    remove_ampersand(config.user);
+    remove_symbol(config.user, '&');
 
 	config.directory = read_until(fd_config, '\n');
 	config.ip = read_until(fd_config, '\n');
 	config.port = read_until(fd_config, '\n');
+	remove_symbol(config.directory, '\r');
+	remove_symbol(config.ip, '\r');
+	remove_symbol(config.port, '\r');
 	close(fd_config);
 
 	asprintf(&string, "%s user has been initialized\n\n", config.user);

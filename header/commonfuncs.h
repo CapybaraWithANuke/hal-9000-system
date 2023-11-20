@@ -5,7 +5,8 @@
 
 typedef struct {
     char type;
-    short header_length;
+    char empty;
+    int header_length;
     char* header;
     char* data;
 } Packet;
