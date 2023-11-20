@@ -132,3 +132,16 @@ void fill_with(char symbol, char* data, int size) {
 		data[i] = symbol;
 	}
 }
+
+void remove_symbol(char* string, char symbol){
+	int i1 = 0, i2 = 0;
+	while (string[i2] != '\0'){
+        
+        if (string[i2] != symbol){
+            string[i1] = string[i2];
+            i1++;
+        }
+        i2++;
+    }
+    string[i1] = '\0';
+}

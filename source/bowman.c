@@ -159,19 +159,6 @@ int check_command(char* string){
 	return INVALID_COMMAND;
 }
 
-void remove_symbol(char* string, char symbol){
-	int i1 = 0, i2 = 0;
-	while (string[i2] != '\0'){
-        
-        if (string[i2] != symbol){
-            string[i1] = string[i2];
-            i1++;
-        }
-        i2++;
-    }
-    string[i1] = '\0';
-}
-
 int system_connect() {
 
 	struct sockaddr_in server;
@@ -185,10 +172,6 @@ int system_connect() {
 		debug("GVHBJNKMNB ");
         return -1;
     }
-	/*debug(config.port);
-	asprintf(&buffer, ".%s. %s.", config.port, config.ip);
-	debug(buffer);
-	free(buffer);*/
     if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         print(2, "Error connecting to the server\n");
 		debug("OHMYGOF");

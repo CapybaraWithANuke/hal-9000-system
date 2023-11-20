@@ -97,9 +97,13 @@ int main(int argc, char *argv[]){
     }
 
 	poole.server_name = read_until(fd_config, '\n');
+    remove_symbol(poole.server_name, '\r');
 	poole.directory = read_until(fd_config, '\n');
+    remove_symbol(poole.directory, '\r');
 	poole.discovery_ip = read_until(fd_config, '\n');
+    remove_symbol(poole.discovery_ip, '\r');
 	string = read_until(fd_config, '\n');
+    remove_symbol(string, '\r');
 	poole.discovery_port = atoi(string);
     free(string);
     poole.poole_ip = read_until(fd_config, '\n');
