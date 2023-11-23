@@ -90,6 +90,8 @@ int setupSocket (char* ip, int port, int server_fd) {
 
 void poole_request(int fd,int pos) {
 
+    debug("ABOUT TO READ POOLE PACKET");
+
     Packet packet = read_packet(fd);
 
     poole_connections[pos].num_clients = 0;
@@ -116,12 +118,15 @@ void redirect_bowman(int fd, int pos) {
     int lowest = 2147483647;
     int lowest_index = 0;
 
+    debug("REDIRECTING...");
+
     for (int i=1; i<num_poole_fds; i++){
         if (poole_connections[i].num_clients <= lowest) {
             lowest_index = i;
             lowest = poole_connections[i].num_clients;
         }
     }
+    debug("Af6ter finding lowest");
     if (lowest_index > 0) {
         char* buffer;
 
@@ -168,7 +173,7 @@ fd_set process_requests (int* max_fd, int* fds, int* num_fds, fd_set set, int bo
                         fds = (int*) realloc(fds, sizeof(int)*(*num_fds + 1));
                         fds[*num_fds] = aux;
                         FD_SET(fds[*num_fds], &set);
-                        num_fds++;
+                        (*num_fds)++;
 
                         if (!bowman_npoole) {
                             poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(*num_fds));
@@ -195,7 +200,7 @@ fd_set process_requests (int* max_fd, int* fds, int* num_fds, fd_set set, int bo
                     }
                     else {
                         logn("Received bowman request");
-                        redirect_bowman(fds[i], *num_fds-1);
+                        redirect_bowman(fds[i], i);
                     }
                 }
             }
