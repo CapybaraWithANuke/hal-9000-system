@@ -94,6 +94,9 @@ Packet read_packet(int fd) {
 	}
 	new_packet.data[i-1] = '\0';
 
+	debug(new_packet.header);
+	debug(new_packet.data);
+
 	return new_packet;
 
 }

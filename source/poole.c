@@ -106,21 +106,17 @@ int main(int argc, char *argv[]){
     free(string);
     close(fd_config);
 
-
-
-
-
-    discovery_fd = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (discovery_fd < 0) {
-        logn(ERR_SOCKET);
-        return ERR;
-    }
-
-    serv_addr.sin_addr.s_addr = inet_addr(poole.discovery_ip);
+    bzero(&serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(poole.discovery_port);
-
+    if(inet_pton(AF_INET, poole.discovery_ip, &serv_addr.sin_addr) < 0) {
+        logn("Error connecting to the server\n");
+        return ERR;
+    }
+    if ((discovery_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+        logn("Error connecting to the server\n");
+        return ERR;
+    }
     if (connect(discovery_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         logn(ERR_CONNECT);
         return ERR;

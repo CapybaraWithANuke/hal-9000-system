@@ -143,35 +143,35 @@ void redirect_bowman(int fd, int pos) {
     }
 }
 
-fd_set process_requests (int* max_fd, int* fds, int num_fds, fd_set set, int bowman_npoole) {
+fd_set process_requests (int* max_fd, int* fds, int* num_fds, fd_set set, int bowman_npoole) {
 
     int i, aux;
     struct timeval timeout = {2, 0};
 
-    for (i=0; i<num_fds; i++){
+    for (i=0; i<*num_fds; i++){
         if (fds[i] > *max_fd){
             *max_fd = fds[i];
         }
     }
 
-    for (i=0; i<num_fds; i++){
+    for (i=0; i<*num_fds; i++){
         FD_SET(fds[i], &set);
     }
 
     if (select(*max_fd + 1, &set, 0, 0, &timeout) > 0) {
-        for (i=0; i<num_fds; i++) {
+        for (i=0; i<*num_fds; i++) {
 
             if (FD_ISSET(fds[i], &set)) {
                 if (i == 0){
                     if ((aux = accept(fds[0], NULL, 0)) > 0) {
 
-                        fds = (int*) realloc(fds, sizeof(int)*(num_fds + 1));
-                        fds[num_fds] = aux;
-                        FD_SET(fds[num_fds], &set);
+                        fds = (int*) realloc(fds, sizeof(int)*(*num_fds + 1));
+                        fds[*num_fds] = aux;
+                        FD_SET(fds[*num_fds], &set);
                         num_fds++;
 
                         if (!bowman_npoole) {
-                            poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(num_fds));
+                            poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(*num_fds));
                             logn("Received poole connection");
                         }
                         else {
@@ -195,7 +195,7 @@ fd_set process_requests (int* max_fd, int* fds, int num_fds, fd_set set, int bow
                     }
                     else {
                         logn("Received bowman request");
-                        redirect_bowman(fds[i], num_fds-1);
+                        redirect_bowman(fds[i], *num_fds-1);
                     }
                 }
             }
@@ -267,8 +267,8 @@ int main (int argc, char** argv) {
     }
 
     while (1) {
-        poole_set = process_requests(&max_poole_fd, poole_fds, num_poole_fds, poole_set, 0);
-        bowman_set = process_requests(&max_bowman_fd, bowman_fds, num_bowman_fds, bowman_set, 1);
+        poole_set = process_requests(&max_poole_fd, poole_fds, &num_poole_fds, poole_set, 0);
+        bowman_set = process_requests(&max_bowman_fd, bowman_fds, &num_bowman_fds, bowman_set, 1);
     }
 
     return 0;
