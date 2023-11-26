@@ -1,5 +1,6 @@
 {
     "files.associations": {
         "commonfuncs.h": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "disabled"
 }

@@ -11,7 +11,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-
+#include <math.h>
 
 #include "../header/commonfuncs.h"
 
@@ -25,6 +25,11 @@
 
 #define ERR -1
 
+#define PLAYLIST_COUNT 3
+#define SONG_COUNT 5
+#define MAX_SONG_LENGTH 256
+
+
 typedef struct{
 	char* server_name; 
 	char* directory;
@@ -36,13 +41,39 @@ typedef struct{
 
 typedef struct {
     char* name;
+    int num_songs;
     char** songs;
 } Playlist;
 
 Poole poole;
-const int song_count = 5;
-const char songs[5][256] = {"despacito", "sway", "gimme chocolate", "oregon boyz", "nowhere to go"};
-Playlist playlist[3];
+const char songs[SONG_COUNT][MAX_SONG_LENGTH] = {"despacito", "sway", "gimme chocolate", "oregon boyz", "nowhere to go"};
+Playlist playlists[PLAYLIST_COUNT];
+
+void initializePlaylists() {
+
+    playlists[0].name = "Dolores";
+    playlists[1].name = "Mildred";
+    playlists[2].name = "Flux";
+
+    playlists[0].num_songs = 2;
+    playlists[1].num_songs = 3;
+    playlists[2].num_songs = 2;
+
+    playlists[0].songs = (char**) malloc(sizeof(char*)*2);
+    playlists[1].songs = (char**) malloc(sizeof(char*)*3);
+    playlists[2].songs = (char**) malloc(sizeof(char*)*2);
+
+    playlists[0].songs[0] = "despacito";
+    playlists[0].songs[1] = "sway";
+
+    playlists[1].songs[0] = "idk";
+    playlists[1].songs[1] = "what to invent";
+    playlists[1].songs[2] = "anymore";
+    
+    playlists[2].songs[0] = "it's 6 AM";
+    playlists[2].songs[1] = "a.";
+
+}
 
 void free_everything(){
     free(poole.server_name);
@@ -75,7 +106,9 @@ int setupSocket(char* ip, int port, int server_fd) {
 
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char *argv[]) {
+
+    initializePlaylists();
 	
     char* string;
 	const char* file_path_start = "config/";
@@ -209,7 +242,7 @@ int main(int argc, char *argv[]){
             FD_SET(sockets_fd[sockets_index], &set);
             ++sockets_index;
             sockets_fd = (int*) realloc(sockets_fd, sizeof(int)*(sockets_index + 1));
-            names_bowmans = (char**) realloc(names_bowmans, size_of(*names_bowmans)*(sockets_index + 1));
+            names_bowmans = (char**) realloc(names_bowmans, sizeof(char*)*(sockets_index + 1));
             FD_SET(server_fd, &set);
             
         }
@@ -232,11 +265,11 @@ int main(int argc, char *argv[]){
                             break;
                         case '2':
                             if (!strcmp(packet.header, "LIST_SONGS")) {
-                                char* data = (char*) calloc((song_count * 2 - 1) + 1, sizeof(char));
+                                char* data = (char*) calloc((SONG_COUNT * 2 - 1) + 1, sizeof(char));
 
-                                for (int i = 0; i < song_count; ++i) {
+                                for (int i = 0; i < SONG_COUNT; ++i) {
                                     strcat(data, songs[i]);
-                                    if (i != (song_count-1)) strcat(data, "&");
+                                    if (i != (SONG_COUNT-1)) strcat(data, "&");
                                 }
                                 
                                 //One additional byte reserved for the number of frames
@@ -250,7 +283,10 @@ int main(int argc, char *argv[]){
                                     if (i == 0) {
                                         buffer[0] = num_frames;
                                         while (strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) {
-                                            strcat(buffer, data[data_index]);
+                                            char aux[2];
+                                            aux[0] = data[data_index];
+                                            aux[1] = '\0';
+                                            strcat(buffer, aux);
                                             ++data_index;
                                         }
                                     
@@ -259,7 +295,10 @@ int main(int argc, char *argv[]){
                                     }
                                     else {
                                         while (strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) {
-                                            strcat(buffer, data[data_index]);
+                                            char aux[2];
+                                            aux[0] = data[data_index];
+                                            aux[1] = '\0';
+                                            strcat(buffer, aux);
                                             ++data_index;
                                         }
 
@@ -269,7 +308,36 @@ int main(int argc, char *argv[]){
 
                                 }
 
+                            }
+
+                            else if (!strcmp(packet.header, "LIST_PLAYLISTS")) {
+                                char* data = (char*) calloc(2, sizeof(char));
+
+                                for (int i = 0; i < PLAYLIST_COUNT; ++i) {
+
+                                    strcat(data, playlists[i].name);
+                                    strcat(data, "&");
+
+                                    for (int j = 0; j < playlists[i].num_songs; ++j) {
+
+                                        strcat(data, playlists[i].songs[j]);
+
+
+                                        if (j < (playlists[i].num_songs-1)) {
+                                            strcat(data, "&");
+                                        }
+                                        else {
+                                            strcat(data, "#");
+                                        }
+
+                                    }
+
+
                                 }
+
+
+
+
                             }
 
                             //send_packet(sockets_fd[sockets_index], 2, )
@@ -285,11 +353,8 @@ int main(int argc, char *argv[]){
 
 
         }
-
+    
     }
-
-
-
 
     free_everything();
 	
