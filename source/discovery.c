@@ -148,31 +148,35 @@ void redirect_bowman(int fd, int pos) {
     }
 }
 
-fd_set process_requests (int* max_fd, int* fds, int* num_fds, fd_set set, int bowman_npoole) {
+void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
 
     int i, aux;
+    int max_fd = 0;
     struct timeval timeout = {2, 0};
+    int received_connection = 0;
 
     for (i=0; i<*num_fds; i++){
-        if (fds[i] > *max_fd){
-            *max_fd = fds[i];
+        if (fds[i] > max_fd){
+            max_fd = fds[i];
         }
     }
 
+    FD_ZERO(set);
     for (i=0; i<*num_fds; i++){
-        FD_SET(fds[i], &set);
+        FD_SET(fds[i], set);
     }
 
-    if (select(*max_fd + 1, &set, 0, 0, &timeout) > 0) {
+    if (select(max_fd + 1, set, 0, 0, &timeout) > 0) {
         for (i=0; i<*num_fds; i++) {
 
-            if (FD_ISSET(fds[i], &set)) {
+            if (FD_ISSET(fds[i], set)) {
                 if (i == 0){
+                    received_connection = 1;
+
                     if ((aux = accept(fds[0], NULL, 0)) > 0) {
 
                         fds = (int*) realloc(fds, sizeof(int)*(*num_fds + 1));
                         fds[*num_fds] = aux;
-                        FD_SET(fds[*num_fds], &set);
                         (*num_fds)++;
 
                         if (!bowman_npoole) {
@@ -194,9 +198,11 @@ fd_set process_requests (int* max_fd, int* fds, int* num_fds, fd_set set, int bo
                 }
                 else {
                     if (!bowman_npoole){
+                        logn("Received poole request");
+                        logni(fds[i]);
                         poole_request(fds[i], i);
                         send_poole_accept(fds[i]);
-                        logn("Received poole request");
+                        
                     }
                     else {
                         logn("Received bowman request");
@@ -204,11 +210,11 @@ fd_set process_requests (int* max_fd, int* fds, int* num_fds, fd_set set, int bo
                     }
                 }
             }
-            else {
+            if (received_connection){
+                return;
             }
         }
     }
-    return set;
 }
 
 int main (int argc, char** argv) {
@@ -220,8 +226,6 @@ int main (int argc, char** argv) {
     char* buffer = NULL;
     fd_set poole_set;
     fd_set bowman_set;
-    int max_poole_fd=0;
-    int max_bowman_fd=0;
 
     if (argc != 2) {
         logn(ERR_ARGC);
@@ -272,8 +276,8 @@ int main (int argc, char** argv) {
     }
 
     while (1) {
-        poole_set = process_requests(&max_poole_fd, poole_fds, &num_poole_fds, poole_set, 0);
-        bowman_set = process_requests(&max_bowman_fd, bowman_fds, &num_bowman_fds, bowman_set, 1);
+        process_requests(poole_fds, &num_poole_fds, &poole_set, 0);
+        process_requests(bowman_fds, &num_bowman_fds, &bowman_set, 1);
     }
 
     return 0;

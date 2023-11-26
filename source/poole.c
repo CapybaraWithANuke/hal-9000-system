@@ -142,7 +142,9 @@ int main(int argc, char *argv[]) {
 	poole.discovery_port = atoi(string);
     free(string);
     poole.poole_ip = read_until(fd_config, '\n');
+    remove_symbol(poole.poole_ip, '\r');
     string = read_until(fd_config, '\n');
+    remove_symbol(string, '\r');
 	poole.poole_port = atoi(string);
     free(string);
     close(fd_config);
@@ -171,11 +173,11 @@ int main(int argc, char *argv[]) {
     char* buffer;
     asprintf(&buffer, "%d", poole.poole_port);
     strcat(frame_data, buffer);
-    free(buffer);
-    
+    debug(frame_data);
 
     send_packet(discovery_fd, 1, "NEW_POOLE", frame_data);
 
+    free(buffer);
     free(frame_data);
 
     Packet packet = read_packet(discovery_fd);
@@ -197,11 +199,6 @@ int main(int argc, char *argv[]) {
 
         packet = read_packet(discovery_fd);
     }
-
-    close(discovery_fd);
-
-
-
 
 
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);

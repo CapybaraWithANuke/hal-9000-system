@@ -77,7 +77,6 @@ Packet read_packet(int fd) {
 	short i;
 
 	debug("READING");
-	debug("READING2");
 	read(fd, &new_packet.type, sizeof(char));
 
 	read(fd, &new_packet.empty, sizeof(char));
@@ -89,7 +88,7 @@ Packet read_packet(int fd) {
 	data_length = 256 - 3 - new_packet.header_length;
 	new_packet.data = (char*) malloc(sizeof(char)*(data_length));
 
-	for (i=0; i<new_packet.header_length; i++){
+	for (i=0; i<new_packet.header_length-1; i++){
 		read(fd, &new_packet.header[i], sizeof(char));
 	}
 	new_packet.header[i] = '\0';
@@ -115,9 +114,9 @@ void send_packet(int fd, int type, char* header, char*data) {
 	debug("SENDING");
 
     packet.type = (char) type;
-    packet.header_length = strlen(header)+1;
+    packet.header_length = strlen(header);
 
-    packet.header = (char*) malloc(sizeof(char)*(packet.header_length));
+    packet.header = (char*) malloc(sizeof(char)*(packet.header_length+1));
 	strcpy(packet.header, header);
 
     int data_length = 256 - 3 - packet.header_length;
@@ -130,7 +129,7 @@ void send_packet(int fd, int type, char* header, char*data) {
 	write(fd, &aux, sizeof(char));
 	aux = (char) packet.header_length;
 	write(fd, &aux, sizeof(char));
-	write(fd, packet.header, sizeof(char)*packet.header_length);
+	write(fd, packet.header, sizeof(char)*strlen(packet.header));
 	write(fd, packet.data, sizeof(char)*data_length);
 
 	debug("SENT");
