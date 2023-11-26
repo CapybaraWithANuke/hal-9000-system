@@ -129,7 +129,6 @@ void redirect_bowman(int fd, int pos) {
     debug("Af6ter finding lowest");
     if (lowest_index > 0) {
         char* buffer;
-
         asprintf(&buffer, "%s&%s&%s", poole_connections[lowest_index].name, poole_connections[lowest_index].ip, poole_connections[lowest_index].port);
         send_packet(fd, 1, "CON_OK", buffer);
         free(buffer);
@@ -141,7 +140,7 @@ void redirect_bowman(int fd, int pos) {
             }
         }
         num_bowman_fds--;
-        bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
+        bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds); 
     }
     else {
         send_accept_error(fd);
