@@ -34,7 +34,15 @@ typedef struct{
 	int poole_port;
 } Poole;
 
+typedef struct {
+    char* name;
+    char** songs;
+} Playlist;
+
 Poole poole;
+const int song_count = 5;
+const char songs[5][256] = {"despacito", "sway", "gimme chocolate", "oregon boyz", "nowhere to go"};
+Playlist playlist[3];
 
 void free_everything(){
     free(poole.server_name);
@@ -201,6 +209,7 @@ int main(int argc, char *argv[]){
             FD_SET(sockets_fd[sockets_index], &set);
             ++sockets_index;
             sockets_fd = (int*) realloc(sockets_fd, sizeof(int)*(sockets_index + 1));
+            names_bowmans = (char**) realloc(names_bowmans, size_of(*names_bowmans)*(sockets_index + 1));
             FD_SET(server_fd, &set);
             
         }
@@ -218,6 +227,53 @@ int main(int argc, char *argv[]){
 
                         case '1':
                             strcpy(names_bowmans[sockets_index], packet.data);
+
+                            send_packet(1, strlen("CON_OK"), "CON_OK", "");
+                            break;
+                        case '2':
+                            if (!strcmp(packet.header, "LIST_SONGS")) {
+                                char* data = (char*) calloc((song_count * 2 - 1) + 1, sizeof(char));
+
+                                for (int i = 0; i < song_count; ++i) {
+                                    strcat(data, songs[i]);
+                                    if (i != (song_count-1)) strcat(data, "&");
+                                }
+                                
+                                //One additional byte reserved for the number of frames
+                                int num_frames = ceil(strlen(data)*1.0/(256 - 4 - strlen("SONGS_RESPONSE")));
+                                int data_index = 0;
+
+                                for (int i = 0; i < num_frames; ++i) {
+
+                                    char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE"))+1, sizeof(char));
+                                    
+                                    if (i == 0) {
+                                        buffer[0] = num_frames;
+                                        while (strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) {
+                                            strcat(buffer, data[data_index]);
+                                            ++data_index;
+                                        }
+                                    
+                                        send_packet(2, strlen("SONGS_RESPONSE"), "SONGS_RESPONSE", buffer);
+                                        
+                                    }
+                                    else {
+                                        while (strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) {
+                                            strcat(buffer, data[data_index]);
+                                            ++data_index;
+                                        }
+
+                                        send_packet(2, strlen("SONGS_RESPONSE"), "SONGS_RESPONSE", buffer);
+
+                                    }
+
+                                }
+
+                                }
+                            }
+
+                            //send_packet(sockets_fd[sockets_index], 2, )
+                            break;
 
                     }
 
