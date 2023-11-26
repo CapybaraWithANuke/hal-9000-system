@@ -267,22 +267,22 @@ int main(int argc, char *argv[]) {
                             if (!strcmp(packet.header, "LIST_SONGS")) {
                                 char* data = (char*) calloc((SONG_COUNT * 2 - 1) + 1, sizeof(char));
 
-                                for (int i = 0; i < SONG_COUNT; ++i) {
-                                    strcat(data, songs[i]);
-                                    if (i != (SONG_COUNT-1)) strcat(data, "&");
+                                for (int j = 0; j < SONG_COUNT; ++j) {
+                                    strcat(data, songs[j]);
+                                    if (j != (SONG_COUNT-1)) strcat(data, "&");
                                 }
                                 
                                 //One additional byte reserved for the number of frames
                                 int num_frames = ceil(strlen(data)*1.0/(256 - 4 - strlen("SONGS_RESPONSE")));
                                 int data_index = 0;
 
-                                for (int i = 0; i < num_frames; ++i) {
+                                for (int j = 0; j < num_frames; ++j) {
 
                                     char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE"))+1, sizeof(char));
                                     
-                                    if (i == 0) {
-                                        buffer[0] = num_frames;
-                                        while (strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) {
+                                    if (j == 0) {
+                                        buffer[0] = num_frames + '0';
+                                        while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
                                             char aux[2];
                                             aux[0] = data[data_index];
                                             aux[1] = '\0';
@@ -294,7 +294,7 @@ int main(int argc, char *argv[]) {
                                         
                                     }
                                     else {
-                                        while (strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) {
+                                        while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
                                             char aux[2];
                                             aux[0] = data[data_index];
                                             aux[1] = '\0';
@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
                                             ++data_index;
                                         }
 
-                                        send_packet(2, strlen("SONGS_RESPONSE"), "SONGS_RESPONSE", buffer);
+                                        send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
 
                                     }
 
@@ -313,17 +313,17 @@ int main(int argc, char *argv[]) {
                             else if (!strcmp(packet.header, "LIST_PLAYLISTS")) {
                                 char* data = (char*) calloc(2, sizeof(char));
 
-                                for (int i = 0; i < PLAYLIST_COUNT; ++i) {
+                                for (int j = 0; j < PLAYLIST_COUNT; ++j) {
 
-                                    strcat(data, playlists[i].name);
+                                    strcat(data, playlists[j].name);
                                     strcat(data, "&");
 
-                                    for (int j = 0; j < playlists[i].num_songs; ++j) {
+                                    for (int k = 0; k < playlists[j].num_songs; ++k) {
 
-                                        strcat(data, playlists[i].songs[j]);
+                                        strcat(data, playlists[j].songs[k]);
 
 
-                                        if (j < (playlists[i].num_songs-1)) {
+                                        if (k < (playlists[j].num_songs-1)) {
                                             strcat(data, "&");
                                         }
                                         else {
@@ -332,6 +332,39 @@ int main(int argc, char *argv[]) {
 
                                     }
 
+
+                                }
+
+                                int num_frames = ceil(strlen(data)/(256 - 4 - strlen("SONGS_RESPONSE")));
+                                char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
+                                int data_index = 0;
+                                for (int j = 0; j < num_frames; ++j) {
+
+                                    if (j == 0) {
+                                        buffer[0] = num_frames + '0';
+
+                                        while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
+                                            char aux[2];
+                                            aux[0] = data[data_index];
+                                            aux[1] = '\0';
+                                            strcat(buffer, aux);
+                                            ++data_index;
+                                        }
+                                    }
+                                    else {
+                                        while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
+                                            char aux[2];
+                                            aux[0] = data[data_index];
+                                            aux[1] = '\0';
+                                            strcat(buffer, aux);
+                                            ++data_index;
+                                        }
+                                    }
+
+                                    send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
+
+                                    free(buffer);
+                                    buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
 
                                 }
 
