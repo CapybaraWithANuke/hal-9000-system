@@ -42,6 +42,7 @@ int* bowman_fds;
 int num_poole_fds = 1;
 int num_bowman_fds = 1;
 Poole* poole_connections;
+int num_pooles = 0;
 
 void leave(int signum){
     
@@ -50,7 +51,7 @@ void leave(int signum){
         free(bowman_fds);
         free(poole_fds);
 
-        for (int i=0; i<num_poole_fds; i++){
+        for (int i=0; i<num_pooles; i++){
             free(poole_connections[i].name);
             free(poole_connections[i].ip);
             free(poole_connections[i].port);
@@ -90,27 +91,40 @@ int setupSocket (char* ip, int port, int server_fd) {
 
 void poole_request(int fd,int pos) {
 
-    debug("ABOUT TO READ POOLE PACKET");
+    Packet packet;
 
-    Packet packet = read_packet(fd);
+    do {
+        packet = read_packet(fd);
+        debug("PACKET READ");
+        
+        if (!strcmp(packet.header, "NEW_POOLE")){
+            debug("BEFORE SPLIT");
 
-    poole_connections[pos].num_clients = 0;
+            poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(++num_pooles));
+            
+            poole_connections[num_pooles-1].name = strtok(packet.data, "&");
+            poole_connections[num_pooles-1].ip = strtok(NULL, "&");
+            poole_connections[num_pooles-1].port = strtok(NULL, "&");
+            poole_connections[num_pooles-1].num_clients = 0;
+            debug("AFTER SPLIT");
 
-    char** strings = split(packet.data, '&');
-    poole_connections[pos].name = strings[0];
-    poole_connections[pos].ip = strings[1];
-    poole_connections[pos].port = strings[2];
+            free(packet.header);
+            free(packet.data);
+            send_packet(fd, 1, "CON_OK", "");
+        }
+        else if (!strcmp(packet.header, "EXIT_POOLE")){
 
-    free(packet.header);
-    free(packet.data);
-}
-
-void send_accept_error(int fd) {
-    send_packet(fd, 1, "CON_KO", "");
-}
-
-void send_poole_accept(int fd) {
-    send_packet(fd, 1, "CON_OK", "");
+            for (int i=pos; i<num_poole_fds-1; i++){
+                poole_fds[i] = poole_fds[i+1];
+            }
+            poole_fds = (int*) realloc(poole_fds, (--num_poole_fds)*sizeof(int));
+            send_packet(fd, 1, "CON_OK", "");
+            close(fd);
+        }
+        else {
+            send_packet(fd, 1, "CON_KO", "");
+        }
+    } while (strcmp(packet.header, "EXIT_POOLE") && strcmp(packet.header, "EXIT_POOLE"));
 }
 
 void redirect_bowman(int fd, int pos) {
@@ -144,7 +158,7 @@ void redirect_bowman(int fd, int pos) {
         bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
     }
     else {
-        send_accept_error(fd);
+        send_packet(fd, 1, "CON_KO", "");
     }
 }
 
@@ -180,7 +194,6 @@ void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
                         (*num_fds)++;
 
                         if (!bowman_npoole) {
-                            poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(*num_fds));
                             logn("Received poole connection");
                         }
                         else {
@@ -189,20 +202,17 @@ void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
                     }
                     else if (bowman_npoole) {
                         logn("ERROR accepting bowman client connection.");
-                        send_accept_error(fds[i]);
+                        send_packet(fds[i], 1, "CON_KO", "");
                     }
                     else {
                         logn("ERROR accepting poole server connection.");
-                        send_accept_error(fds[i]);
+                        send_packet(fds[i], 1, "CON_KO", "");
                     }
                 }
                 else {
                     if (!bowman_npoole){
                         logn("Received poole request");
-                        logni(fds[i]);
-                        poole_request(fds[i], i);
-                        send_poole_accept(fds[i]);
-                        
+                        poole_request(fds[i], i);                        
                     }
                     else {
                         logn("Received bowman request");

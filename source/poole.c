@@ -173,7 +173,6 @@ int main(int argc, char *argv[]) {
     char* buffer;
     asprintf(&buffer, "%d", poole.poole_port);
     strcat(frame_data, buffer);
-    debug(frame_data);
 
     send_packet(discovery_fd, 1, "NEW_POOLE", frame_data);
 
@@ -199,7 +198,17 @@ int main(int argc, char *argv[]) {
 
         packet = read_packet(discovery_fd);
     }
+    free(packet.data);
+    free(packet.header);
 
+    do {
+        send_packet(discovery_fd, 6, "EXIT_POOLE", "");
+        packet = read_packet(discovery_fd);
+    } while (strcmp(packet.header, "CON_OK"));
+
+    close(discovery_fd);
+    free(packet.data);
+    free(packet.header);
 
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     

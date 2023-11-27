@@ -27,27 +27,6 @@ char * read_until(int fd, char end) {
 	return string;
 }
 
-char** split(char* string, char character) {
-	char** strings;
-	int i=0, j, k=0;
-
-	do {
-		strings = (char**) realloc(strings, sizeof(char*)*(i + 1));
-		strings[i] = (char*) malloc(sizeof(char));
-		for (j=0; string[k] != character && string[k] != '\0'; k++){
-
-			strings[i][j] = string[k];
-			strings[i] = (char*) realloc(strings[i], sizeof(char)*(j + 2));
-			j++;
-		}
-		strings[i][j] = '\0';
-		i++;
-		k++;
-	} while (string[k-1] != '\0');
-
-	return strings;
-}
-
 void logn(char* x) {
 	char* x_new = (char*) calloc(1, strlen(x)+1);
     strcat(x_new, x);
@@ -84,11 +63,11 @@ Packet read_packet(int fd) {
 	debug("READ HEADER LENGTH");
 	new_packet.header_length = (int) new_packet.empty;
 
-	new_packet.header = (char*) malloc(sizeof(char)*(new_packet.header_length));
+	new_packet.header = (char*) malloc(sizeof(char)*(new_packet.header_length+1));
 	data_length = 256 - 3 - new_packet.header_length;
 	new_packet.data = (char*) malloc(sizeof(char)*(data_length));
 
-	for (i=0; i<new_packet.header_length-1; i++){
+	for (i=0; i<new_packet.header_length; i++){
 		read(fd, &new_packet.header[i], sizeof(char));
 	}
 	new_packet.header[i] = '\0';
@@ -118,6 +97,7 @@ void send_packet(int fd, int type, char* header, char*data) {
 
     packet.header = (char*) malloc(sizeof(char)*(packet.header_length+1));
 	strcpy(packet.header, header);
+	packet.header = (char*) realloc(packet.header, sizeof(char)*packet.header_length);
 
     int data_length = 256 - 3 - packet.header_length;
     packet.data = (char*) malloc(sizeof(char)*data_length);
@@ -129,7 +109,7 @@ void send_packet(int fd, int type, char* header, char*data) {
 	write(fd, &aux, sizeof(char));
 	aux = (char) packet.header_length;
 	write(fd, &aux, sizeof(char));
-	write(fd, packet.header, sizeof(char)*strlen(packet.header));
+	write(fd, packet.header, sizeof(char)*packet.header_length);
 	write(fd, packet.data, sizeof(char)*data_length);
 
 	debug("SENT");

@@ -174,18 +174,10 @@ int system_connect() {
     }
     if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         print(2, "Error connecting to the server\n");
-		debug("OHMYGOF");
         return -1;
     }
     if(connect(server_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
         print(2, "Error connecting to the server\n");
-		debug("HEÑÑ=");
-		debug(config.port);
-		print(1, config.port);
-		print(1, "sddsdds");
-		asprintf(&buffer, "%s...%s", config.ip, config.port);
-		debug(buffer);
-		free(buffer);
         close(server_fd);
         return -1;
     }
@@ -194,19 +186,30 @@ int system_connect() {
 	Packet packet = read_packet(server_fd);
 
 	if (!strcmp(packet.header,"CON_OK")) {
-		char** strings = split(packet.data, '&');
+		
 		close(server_fd);
 		free(packet.header);
 		free(packet.data);
+		
+		char* name_string = strtok(packet.data, "&");
+		char* ip_string = strtok(packet.data, "&");
+		char* port_string = strtok(packet.data, "&");
 
 		bzero(&server, sizeof(server));
 		server.sin_family = AF_INET;
-		server.sin_port = htons(atoi(strings[2]));
+		server.sin_port = htons(atoi(port_string));
 		
-		if(inet_pton(AF_INET, strings[1], &server.sin_addr) < 0) {
+		if(inet_pton(AF_INET, ip_string, &server.sin_addr) < 0) {
 			print(2, "Error connecting to the server\n");
+			free(name_string);
+			free(ip_string);
+			free(port_string);
 			return -1;
 		}
+		free(name_string);
+		free(ip_string);
+		free(port_string);
+
 		if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 			print(2, "Error connecting to the server\n");
 			return -1;
