@@ -48,6 +48,13 @@ void leave(int signum){
     
     if (signum == SIGINT){
 
+        for (int i=0; i<num_bowman_fds; i++){
+            close(bowman_fds[i]);
+        }
+        for (int i=0; i<num_poole_fds; i++){
+            close(poole_fds[i]);
+        }
+
         free(bowman_fds);
         free(poole_fds);
 
@@ -92,8 +99,13 @@ int setupSocket (char* ip, int port, int server_fd) {
 void poole_request(int fd,int pos) {
 
     Packet packet;
+    int i = 0;
 
     do {
+        if (i != 0){
+            free(packet.header);
+            free(packet.data);
+        }
         packet = read_packet(fd);
         debug("PACKET READ");
         
@@ -108,8 +120,6 @@ void poole_request(int fd,int pos) {
             poole_connections[num_pooles-1].num_clients = 0;
             debug("AFTER SPLIT");
 
-            free(packet.header);
-            free(packet.data);
             send_packet(fd, 1, "CON_OK", "");
         }
         else if (!strcmp(packet.header, "EXIT_POOLE")){
@@ -124,42 +134,69 @@ void poole_request(int fd,int pos) {
         else {
             send_packet(fd, 1, "CON_KO", "");
         }
-    } while (strcmp(packet.header, "EXIT_POOLE") && strcmp(packet.header, "EXIT_POOLE"));
+        i++;
+    } while (strcmp(packet.header, "NEW_POOLE") && strcmp(packet.header, "EXIT_POOLE"));
 }
 
 void redirect_bowman(int fd, int pos) {
 
     int lowest = 2147483647;
-    int lowest_index = 0;
+    int lowest_index = -1;
+    Packet packet;
+    int i=0;
 
-    debug("REDIRECTING...");
-
-    for (int i=1; i<num_poole_fds; i++){
-        if (poole_connections[i].num_clients <= lowest) {
-            lowest_index = i;
-            lowest = poole_connections[i].num_clients;
+    debug("IN REDIRECT");
+    do {
+        if (i != 0){
+            free(packet.header);
+            free(packet.data);
         }
-    }
-    debug("Af6ter finding lowest");
-    if (lowest_index > 0) {
-        char* buffer;
+        packet = read_packet(fd);
+        debug("AFTER READ BOWMAN PACKET");
 
-        asprintf(&buffer, "%s&%s&%s", poole_connections[lowest_index].name, poole_connections[lowest_index].ip, poole_connections[lowest_index].port);
-        send_packet(fd, 1, "CON_OK", buffer);
-        free(buffer);
+        if (!strcmp(packet.header, "NEW_BOWMAN")) {
+            debug("REDIRECTING...");
 
-        for (int i=pos; i<num_bowman_fds; i++){
-            
-            if (pos != num_bowman_fds - 1){
-                bowman_fds[pos] = bowman_fds[pos+1];
+            for (int i=0; i<num_pooles; i++){
+                if (poole_connections[i].num_clients <= lowest) {
+                    lowest_index = i;
+                    lowest = poole_connections[i].num_clients;
+                }
+            }
+            debug("Af6ter finding lowest");
+            if (lowest_index >= 0) {
+                char* buffer;
+
+                debug("IN");
+                debug(poole_connections[lowest_index].name);
+                debug(poole_connections[lowest_index].ip);
+                debug(poole_connections[lowest_index].port);
+                asprintf(&buffer, "%s&%s&%s", poole_connections[lowest_index].name, poole_connections[lowest_index].ip, poole_connections[lowest_index].port);
+                send_packet(fd, 1, "CON_OK", buffer);
+                free(buffer);
+
+                for (int i=pos; i<num_bowman_fds; i++){
+                    
+                    if (pos != num_bowman_fds - 1){
+                        bowman_fds[pos] = bowman_fds[pos+1];
+                    }
+                }
+                num_bowman_fds--;
+                bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
+            }
+            else {
+                debug("NOT IN");
+                send_packet(fd, 1, "CON_KO", "");
             }
         }
-        num_bowman_fds--;
-        bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
-    }
-    else {
-        send_packet(fd, 1, "CON_KO", "");
-    }
+        else if (!strcmp(packet.header, "EXIT_BOWMAN")) {
+            
+        }
+        else {
+            send_packet(fd, 7, "CON_KO", "");
+        }
+        i++;
+    } while(strcmp(packet.header, "NEW_BOWMAN") && strcmp(packet.header, "EXIT_BOWMAN"));
 }
 
 void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
@@ -215,7 +252,8 @@ void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
                         poole_request(fds[i], i);                        
                     }
                     else {
-                        logn("Received bowman request");
+                        logn("bowman request");
+                        debug("BHNJMK;");
                         redirect_bowman(fds[i], i);
                     }
                 }

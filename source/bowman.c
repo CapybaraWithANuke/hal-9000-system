@@ -38,8 +38,22 @@ typedef struct{
 	char* port;
 } Config;
 
-int server_fd = -1;
+int discovery_fd = -1;
+int poole_fd = -1;
 Config config;
+
+void exit_discovery() {
+
+	Packet packet;
+	do {
+        send_packet(discovery_fd, 6, "EXIT_POOLE", "");
+        packet = read_packet(discovery_fd);
+    } while (strcmp(packet.header, "CON_OK"));
+
+    close(discovery_fd);
+    free(packet.data);
+    free(packet.header);
+}
 
 void leave(){
 
@@ -47,8 +61,11 @@ void leave(){
     free(config.directory);
     free(config.ip);
 	free(config.port);
-	if (server_fd > 0){
-		close(server_fd);
+	if (discovery_fd > 0){
+		exit_discovery();
+	}
+	if (poole_fd > 0){
+		close(poole_fd);
 	}
 	exit (0);
 }
@@ -169,31 +186,30 @@ int system_connect() {
     server.sin_port = htons(atoi(config.port));
     if(inet_pton(AF_INET, config.ip, &server.sin_addr) < 0) {
         print(2, "Error connecting to the server\n");
-		debug("GVHBJNKMNB ");
         return -1;
     }
-    if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+    if ((discovery_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         print(2, "Error connecting to the server\n");
         return -1;
     }
-    if(connect(server_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
+    if(connect(discovery_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
         print(2, "Error connecting to the server\n");
-        close(server_fd);
+        close(discovery_fd);
         return -1;
     }
-	send_packet(server_fd, 1, "NEW_BOWMAN", config.user);
+	send_packet(discovery_fd, 1, "NEW_BOWMAN", config.user);
 
-	Packet packet = read_packet(server_fd);
+	Packet packet = read_packet(discovery_fd);
 
 	if (!strcmp(packet.header,"CON_OK")) {
-		
-		close(server_fd);
-		free(packet.header);
-		free(packet.data);
-		
+
 		char* name_string = strtok(packet.data, "&");
-		char* ip_string = strtok(packet.data, "&");
-		char* port_string = strtok(packet.data, "&");
+		char* ip_string = strtok(NULL, "&");
+		char* port_string = strtok(NULL, "&");
+
+		debug(name_string);
+		debug(ip_string);
+		debug(port_string);
 
 		bzero(&server, sizeof(server));
 		server.sin_family = AF_INET;
@@ -204,24 +220,26 @@ int system_connect() {
 			free(name_string);
 			free(ip_string);
 			free(port_string);
+			exit_discovery();
 			return -1;
 		}
-		free(name_string);
-		free(ip_string);
-		free(port_string);
+		free(packet.header);
+		free(packet.data);
 
-		if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+		if ((poole_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 			print(2, "Error connecting to the server\n");
+			exit_discovery();
 			return -1;
 		}
-		if(connect(server_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
+		if(connect(poole_fd, (struct sockaddr*) &server, sizeof(server)) < 0) {
 			print(2, "Error connecting to the server\n");
-			close(server_fd);
+			exit_discovery();
+			close(poole_fd);
 			return -1;
 		}
-		send_packet(server_fd, 1, "NEW_BOWMAN", config.user);
+		send_packet(poole_fd, 1, "NEW_BOWMAN", config.user);
 
-		Packet packet = read_packet(server_fd);
+		Packet packet = read_packet(poole_fd);
 
 		if (!strcmp(packet.header,"CON_OK")) {
 			free(packet.header);
@@ -230,7 +248,7 @@ int system_connect() {
 			asprintf(&buffer, "%s connected to HAL 9000 system, welcome music lover!", config.user);
 			logn(buffer);
 			free(buffer);
-			return server_fd;
+			return poole_fd;
 		}
 	}
 	free(packet.header);
@@ -244,7 +262,6 @@ int main(int argc, char *argv[]){
 	char* string = NULL;
 	const char* file_path_start = "config/";
     char* file_path = NULL;
-	int server_fd = -1;
 	
 	signal(SIGINT, leave);
 
@@ -265,6 +282,7 @@ int main(int argc, char *argv[]){
 
 	config.user = read_until(fd_config, '\n');
     remove_symbol(config.user, '&');
+	remove_symbol(config.user, '\r');
 
 	config.directory = read_until(fd_config, '\n');
 	config.ip = read_until(fd_config, '\n');
@@ -290,13 +308,13 @@ int main(int argc, char *argv[]){
 			print(2, "Unknown command.\n");
 		}
 		else {
-			if (command == CONNECT && server_fd > 0){
+			if (command == CONNECT && poole_fd > 0){
 				logn("Already connected");
 				command = 10;
 			}
 			switch (command){
 				case CONNECT :
-					server_fd = system_connect();
+					poole_fd = system_connect();
 					break;
 				case LOGOUT :
 					break;

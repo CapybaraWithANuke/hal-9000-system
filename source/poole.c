@@ -234,6 +234,7 @@ int main(int argc, char *argv[]) {
     int nfds = server_fd+1;
 
     setupSocket(poole.poole_ip, poole.poole_port, server_fd);
+    debug("AFTER setting up socket");
 
     while(69) {
 
