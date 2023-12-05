@@ -107,10 +107,8 @@ void poole_request(int fd,int pos) {
             free(packet.data);
         }
         packet = read_packet(fd);
-        debug("PACKET READ");
         
         if (!strcmp(packet.header, "NEW_POOLE")){
-            debug("BEFORE SPLIT");
 
             poole_connections = (Poole*) realloc (poole_connections, sizeof(Poole)*(++num_pooles));
             
@@ -118,7 +116,6 @@ void poole_request(int fd,int pos) {
             poole_connections[num_pooles-1].ip = strtok(NULL, "&");
             poole_connections[num_pooles-1].port = strtok(NULL, "&");
             poole_connections[num_pooles-1].num_clients = 0;
-            debug("AFTER SPLIT");
 
             send_packet(fd, 1, "CON_OK", "");
         }
@@ -145,17 +142,14 @@ void redirect_bowman(int fd, int pos) {
     Packet packet;
     int i=0;
 
-    debug("IN REDIRECT");
     do {
         if (i != 0){
             free(packet.header);
             free(packet.data);
         }
         packet = read_packet(fd);
-        debug("AFTER READ BOWMAN PACKET");
 
         if (!strcmp(packet.header, "NEW_BOWMAN")) {
-            debug("REDIRECTING...");
 
             for (int i=0; i<num_pooles; i++){
                 if (poole_connections[i].num_clients <= lowest) {
@@ -163,14 +157,9 @@ void redirect_bowman(int fd, int pos) {
                     lowest = poole_connections[i].num_clients;
                 }
             }
-            debug("Af6ter finding lowest");
             if (lowest_index >= 0) {
                 char* buffer;
 
-                debug("IN");
-                debug(poole_connections[lowest_index].name);
-                debug(poole_connections[lowest_index].ip);
-                debug(poole_connections[lowest_index].port);
                 asprintf(&buffer, "%s&%s&%s", poole_connections[lowest_index].name, poole_connections[lowest_index].ip, poole_connections[lowest_index].port);
                 send_packet(fd, 1, "CON_OK", buffer);
                 free(buffer);
@@ -185,7 +174,6 @@ void redirect_bowman(int fd, int pos) {
                 bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
             }
             else {
-                debug("NOT IN");
                 send_packet(fd, 1, "CON_KO", "");
             }
         }
@@ -203,7 +191,7 @@ void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
 
     int i, aux;
     int max_fd = 0;
-    struct timeval timeout = {2, 0};
+    struct timeval timeout = {0, 1};
     int received_connection = 0;
 
     for (i=0; i<*num_fds; i++){
@@ -252,8 +240,7 @@ void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
                         poole_request(fds[i], i);                        
                     }
                     else {
-                        logn("bowman request");
-                        debug("BHNJMK;");
+                        logn("Received bowman request");
                         redirect_bowman(fds[i], i);
                     }
                 }

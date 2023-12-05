@@ -67,7 +67,7 @@ void leave(){
 	if (poole_fd > 0){
 		close(poole_fd);
 	}
-	exit (0);
+	exit (-1);
 }
 
 int check_argument(int* i, int command,  char* string){
@@ -206,10 +206,6 @@ int system_connect() {
 		char* name_string = strtok(packet.data, "&");
 		char* ip_string = strtok(NULL, "&");
 		char* port_string = strtok(NULL, "&");
-
-		debug(name_string);
-		debug(ip_string);
-		debug(port_string);
 
 		bzero(&server, sizeof(server));
 		server.sin_family = AF_INET;
