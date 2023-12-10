@@ -43,6 +43,13 @@ void debug(char* x) {
     free(x_new);
 }
 
+void logi(int x) {
+    char* buffer;
+    asprintf(&buffer, "%d", x);
+    log(buffer);
+    free(buffer);
+}
+
 void logni(int x) {
     char* buffer;
     asprintf(&buffer, "%d\n", x);

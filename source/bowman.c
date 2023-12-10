@@ -253,6 +253,195 @@ int system_connect() {
 	return -1;
 }
 
+void list_songs() {
+
+	int i = 1;
+	int finished = 0;
+	char* input;
+	char** song_name = (char**) calloc(1, sizeof(char*));
+	int num_songs = 0;
+	int num_char = 0;
+	int data_size = 256 - 3 - strlen("SONGS_RESPONSE");
+	Packet packet;
+
+	send_packet(poole_fd, 2, "LIST_SONGS", "");
+	input = (char*) calloc(1, sizeof(char));
+	input[0] = '\0';
+
+	do{
+		if (i!=1) {
+			free(packet.header);
+			free(packet.data);
+		}
+		packet = read_packet(poole_fd);
+
+		if (strcmp(packet.header, "SONGS_RESPONSE")){
+			free(packet.header);
+			free(packet.data);
+			free(input);
+			logn("There has been an error listing the songs");
+			return;
+		}
+		input = (char*) realloc((i*data_size)+1, sizeof(char));
+		strcat(input, packet.data);
+		i++;
+	} while (packet.data[data_size-1] != '\0');
+
+	free(packet.header);
+	free(packet.data);
+
+	song_name[0] = (char*) calloc(1, sizeof(char));
+
+	for (i=0; 1; i++) {
+
+		if (input[i] == '\0'){
+			song_name[num_songs][num_char] ='\0';
+			num_songs++;
+			break;
+		}
+		else if (input[i] == '&'){
+			song_name[num_songs][num_char] ='\0';
+			num_char = 0;
+			song_name = (char**) realloc(song_name, (++num_songs + 1)*sizeof(char*));
+			song_name[0] = (char*) calloc(1, sizeof(char));
+		}
+		else {
+			song_name[num_songs][num_char] = input[i];
+			song_name[num_songs] = (char*) realloc(song_name[num_songs], (++num_char + 1)*sizeof(char));
+		}
+	}
+	log("There are "); logi(num_songs); logn(" songs available for download:");
+
+	for (i=0; i<num_songs; i++) {
+		logi(i+1); log(". "); log(song_name[i]); logn("");
+		free(song_name[i]);
+	}
+	logn("");
+
+	free(song_name);
+	free(input);
+}
+
+void list_songs() {
+
+	int i = 1;
+	int finished = 0;
+	char* input;
+	char*** playlists = (char***) calloc(1, sizeof(char**));
+	int* num_songs = (int*) calloc(1, sizeof(int));
+	int num_playlists = 0;
+	int num_char = 0;
+	int data_size = 256 - 3 - strlen("SONGS_RESPONSE");
+	char* buffer;
+	Packet packet;
+
+	send_packet(poole_fd, 2, "LIST_SONGS", "");
+	input = (char*) calloc(1, sizeof(char));
+	input[0] = '\0';
+
+	do{
+		if (i!=1) {
+			free(packet.header);
+			free(packet.data);
+		}
+		packet = read_packet(poole_fd);
+
+		if (strcmp(packet.header, "SONGS_RESPONSE")){
+			free(packet.header);
+			free(packet.data);
+			free(input);
+			logn("There has been an error listing the songs");
+			return;
+		}
+		input = (char*) realloc((i*data_size)+1, sizeof(char));
+		strcat(input, packet.data);
+		i++;
+	} while (packet.data[data_size-1] != '\0');
+
+	free(packet.header);
+	free(packet.data);
+
+	playlists[0] = (char**) calloc(1, sizeof(char*));
+	playlists[0][0] = (char*) calloc(1, sizeof(char));
+
+	for (i=0; 1; i++) {
+
+		if (input[i] == '\0'){
+			playlists[num_playlists][num_songs[num_playlists]][num_char] ='\0';
+			num_songs[num_playlists]++;
+			num_playlists++;
+			break;
+		}
+		else if (input[i] == '#') {
+			playlists[num_playlists][num_songs[num_playlists]][num_char] ='\0';
+			num_char = 0;
+			playlists = (char***) realloc(playlists, (++num_playlists + 1)*sizeof(char**));
+			playlists[num_playlists] = (char**) calloc(1, sizeof(char*));
+			playlists[num_playlists][0] = (char*) calloc(1, sizeof(char));
+			num_songs[num_playlists] = 0;
+		}
+		else if (input[i] == '&'){
+			playlists[num_playlists][num_songs[num_playlists]][num_char] ='\0';
+			num_char = 0;
+			playlists[num_playlists] = (char**) realloc(playlists[num_playlists], (++num_songs[num_playlists] + 1)*sizeof(char));
+			playlists[num_playlists][num_songs[num_playlists]] = (char*) calloc(1, sizeof(char));
+
+		}
+		else {
+			playlists[num_playlists][num_songs[num_playlists]][num_char] = input[i];
+			playlists[num_playlists][num_songs[num_playlists]] = (char*) realloc(playlists[num_playlists][num_songs], (++num_char + 1)*sizeof(char));
+		}
+	}
+	log("There are "); logi(num_playlists); logn(" lists available for download:");
+
+	for (i=0; i<num_playlists; i++) {
+		logi(i+1); log(". "); logn(playlists[i][0]);
+		free(playlists[i][0]);
+		for (int j=1; j<num_songs[i]; j++) {
+			asprintf(&buffer, "\t%c. %s\n", (char)('a'+j-1), playlists[i][j]);
+			log(buffer);
+			free(buffer);
+			free(playlists[i][j]);
+		}
+		free(playlists[i]);
+	}	
+	free(playlists);
+	free(num_songs);
+	free(input);
+}
+
+void logout() {
+
+	Packet packet;
+	int i = 0;
+
+	do {
+		if (i != 0){
+			free(packet.header);
+			free(packet.data);
+		}
+        send_packet(poole_fd, 6, "EXIT", "");
+        packet = read_packet(poole_fd);
+		i++;
+    } while (strcmp(packet.header, "CONOK"));
+
+	close(poole_fd);
+	poole_fd = -1;
+
+	do {
+		free(packet.header);
+		free(packet.data);
+
+        send_packet(poole_fd, 6, "EXIT_BOWMAN", "");
+        packet = read_packet(poole_fd);
+    } while (strcmp(packet.header, "CON_OK"));
+
+	close(discovery_fd);
+	discovery_fd = -1;
+	free(packet.header);
+	free(packet.data);
+}
+
 int main(int argc, char *argv[]){
 	int command = 0;
 	char* string = NULL;
@@ -304,8 +493,12 @@ int main(int argc, char *argv[]){
 			print(2, "Unknown command.\n");
 		}
 		else {
-			if (command == CONNECT && poole_fd > 0){
+			if (command == CONNECT && poole_fd != -1){
 				logn("Already connected");
+				command = 10;
+			}
+			if (command != CONNECT && poole_fd == -1){
+				logn("Need to be connected for this command");
 				command = 10;
 			}
 			switch (command){
@@ -313,10 +506,12 @@ int main(int argc, char *argv[]){
 					poole_fd = system_connect();
 					break;
 				case LOGOUT :
+					logout();
 					break;
 				case DOWNLOAD :
 					break;
 				case LIST_SONGS :
+					list_songs();
 					break;
 				case LIST_PLAYLISTS :
 					break;

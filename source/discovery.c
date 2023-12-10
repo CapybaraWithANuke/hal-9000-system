@@ -129,7 +129,7 @@ void poole_request(int fd,int pos) {
             close(fd);
         }
         else {
-            send_packet(fd, 1, "CON_KO", "");
+            send_packet(fd, 7, "CON_KO", "");
         }
         i++;
     } while (strcmp(packet.header, "NEW_POOLE") && strcmp(packet.header, "EXIT_POOLE"));
@@ -170,15 +170,29 @@ void redirect_bowman(int fd, int pos) {
                         bowman_fds[pos] = bowman_fds[pos+1];
                     }
                 }
+                poole_connections[lowest_index].num_clients++;
                 num_bowman_fds--;
                 bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
             }
             else {
-                send_packet(fd, 1, "CON_KO", "");
+                send_packet(fd, 7, "CON_KO", "");
             }
         }
         else if (!strcmp(packet.header, "EXIT_BOWMAN")) {
-            
+
+            for (int i=pos; i<num_bowman_fds-1; i++){
+                bowman_fds[i] = bowman_fds[i+1];
+            }
+            bowman_fds = (int*) realloc(bowman_fds, (--num_bowman_fds)*sizeof(int));
+            send_packet(fd, 1, "CON_OK", "");
+            close(fd);
+
+            for (int i=0; i<num_pooles; i++){
+                if (!strcmp(poole_connections[i].name, packet.header)){
+                    poole_connections[i].num_clients--;
+                    break;
+                }
+            }
         }
         else {
             send_packet(fd, 7, "CON_KO", "");
@@ -227,11 +241,11 @@ void process_requests (int* fds, int* num_fds, fd_set* set, int bowman_npoole) {
                     }
                     else if (bowman_npoole) {
                         logn("ERROR accepting bowman client connection.");
-                        send_packet(fds[i], 1, "CON_KO", "");
+                        send_packet(fds[i], 7, "CON_KO", "");
                     }
                     else {
                         logn("ERROR accepting poole server connection.");
-                        send_packet(fds[i], 1, "CON_KO", "");
+                        send_packet(fds[i], 7, "CON_KO", "");
                     }
                 }
                 else {

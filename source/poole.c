@@ -201,9 +201,15 @@ int main(int argc, char *argv[]) {
     free(packet.data);
     free(packet.header);
 
+    int i = 0;
     do {
+        if (i != 0){
+            free(packet.header);
+            free(packet.data);
+        }
         send_packet(discovery_fd, 6, "EXIT_POOLE", "");
         packet = read_packet(discovery_fd);
+        i++;
     } while (strcmp(packet.header, "CON_OK"));
 
     close(discovery_fd);
@@ -239,7 +245,7 @@ int main(int argc, char *argv[]) {
 
         FD_ZERO(&set);
         FD_SET(server_fd, &set);
-        for (int i = 0; i<sockets_index; i++) {
+        for (i = 0; i < sockets_index; i++) {
             FD_SET(sockets_fd[i], &set);
         }
 
@@ -257,7 +263,7 @@ int main(int argc, char *argv[]) {
             names_bowmans = (char**) realloc(names_bowmans, sizeof(char*)*(sockets_index + 1));
         }
 
-        for (int i = 0; i < sockets_index; ++i) {
+        for (i = 0; i < sockets_index; ++i) {
 
             if (FD_ISSET(sockets_fd[i], &set)) {
                 

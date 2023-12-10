@@ -11,12 +11,12 @@ typedef struct {
     char* data;
 } Packet;
 
-
 char * read_until(int fd, char end);
 void logn(char* x);
+void debug(char* x);
+void logi(int x);
 void logni(int x);
 Packet read_packet(int fd);
-void debug(char* x);
 void fill_with(char symbol, char* data, int size);
 void send_packet(int fd, int type, char* header, char*data);
 char** split(char* string, char character);
