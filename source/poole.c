@@ -106,6 +106,115 @@ int setupSocket(char* ip, int port, int server_fd) {
 
 }
 
+void listSongs(int* sockets_fd, int i) {
+
+    char* data = (char*) calloc((SONG_COUNT * 2 - 1) + 1, sizeof(char));
+
+    for (int j = 0; j < SONG_COUNT; ++j) {
+        strcat(data, songs[j]);
+        if (j != (SONG_COUNT-1)) strcat(data, "&");
+    }
+    
+    //One additional byte reserved for the number of frames
+    int num_frames = ceil(strlen(data)*1.0/(256 - 4 - strlen("SONGS_RESPONSE")));
+    int data_index = 0;
+
+    for (int j = 0; j < num_frames; ++j) {
+
+        char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE"))+1, sizeof(char));
+        
+        if (j == 0) {
+            buffer[0] = num_frames + '0';
+            while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
+                char aux[2];
+                aux[0] = data[data_index];
+                aux[1] = '\0';
+                strcat(buffer, aux);
+                ++data_index;
+            }
+        
+            send_packet(2, strlen("SONGS_RESPONSE"), "SONGS_RESPONSE", buffer);
+            
+        }
+        else {
+            while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
+                char aux[2];
+                aux[0] = data[data_index];
+                aux[1] = '\0';
+                strcat(buffer, aux);
+                ++data_index;
+            }
+
+            send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
+
+        }
+
+    }
+
+
+}
+
+void listPlaylists(int* sockets_fd, int i) {
+
+    char* data = (char*) calloc(2, sizeof(char));
+
+    for (int j = 0; j < PLAYLIST_COUNT; ++j) {
+
+        strcat(data, playlists[j].name);
+        strcat(data, "&");
+
+        for (int k = 0; k < playlists[j].num_songs; ++k) {
+
+            strcat(data, playlists[j].songs[k]);
+
+
+            if (k < (playlists[j].num_songs-1)) {
+                strcat(data, "&");
+            }
+            else {
+                strcat(data, "#");
+            }
+
+        }
+
+
+    }
+
+    int num_frames = ceil(strlen(data)/(256 - 4 - strlen("SONGS_RESPONSE")));
+    char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
+    int data_index = 0;
+    for (int j = 0; j < num_frames; ++j) {
+
+        if (j == 0) {
+            buffer[0] = num_frames + '0';
+
+            while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
+                char aux[2];
+                aux[0] = data[data_index];
+                aux[1] = '\0';
+                strcat(buffer, aux);
+                ++data_index;
+            }
+        }
+        else {
+            while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
+                char aux[2];
+                aux[0] = data[data_index];
+                aux[1] = '\0';
+                strcat(buffer, aux);
+                ++data_index;
+            }
+        }
+
+        send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
+
+        free(buffer);
+        buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
+
+    }
+
+}
+
 int main(int argc, char *argv[]) {
 
     initializePlaylists();
@@ -273,115 +382,13 @@ int main(int argc, char *argv[]) {
                         break;
                     case 2:
                         if (!strcmp(packet.header, "LIST_SONGS")) {
-                            char* data = (char*) calloc((SONG_COUNT * 2 - 1) + 1, sizeof(char));
-
-                            for (int j = 0; j < SONG_COUNT; ++j) {
-                                strcat(data, songs[j]);
-                                if (j != (SONG_COUNT-1)) strcat(data, "&");
-                            }
-                            
-                            //One additional byte reserved for the number of frames
-                            int num_frames = ceil(strlen(data)*1.0/(256 - 4 - strlen("SONGS_RESPONSE")));
-                            int data_index = 0;
-
-                            for (int j = 0; j < num_frames; ++j) {
-
-                                char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE"))+1, sizeof(char));
-                                
-                                if (j == 0) {
-                                    buffer[0] = num_frames + '0';
-                                    while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
-                                        char aux[2];
-                                        aux[0] = data[data_index];
-                                        aux[1] = '\0';
-                                        strcat(buffer, aux);
-                                        ++data_index;
-                                    }
-                                
-                                    send_packet(2, strlen("SONGS_RESPONSE"), "SONGS_RESPONSE", buffer);
-                                    
-                                }
-                                else {
-                                    while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
-                                        char aux[2];
-                                        aux[0] = data[data_index];
-                                        aux[1] = '\0';
-                                        strcat(buffer, aux);
-                                        ++data_index;
-                                    }
-
-                                    send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
-
-                                }
-
-                            }
-
+                            listSongs(sockets_fd, i);
                         }
 
                         else if (!strcmp(packet.header, "LIST_PLAYLISTS")) {
-                            char* data = (char*) calloc(2, sizeof(char));
-
-                            for (int j = 0; j < PLAYLIST_COUNT; ++j) {
-
-                                strcat(data, playlists[j].name);
-                                strcat(data, "&");
-
-                                for (int k = 0; k < playlists[j].num_songs; ++k) {
-
-                                    strcat(data, playlists[j].songs[k]);
-
-
-                                    if (k < (playlists[j].num_songs-1)) {
-                                        strcat(data, "&");
-                                    }
-                                    else {
-                                        strcat(data, "#");
-                                    }
-
-                                }
-
-
-                            }
-
-                            int num_frames = ceil(strlen(data)/(256 - 4 - strlen("SONGS_RESPONSE")));
-                            char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
-                            int data_index = 0;
-                            for (int j = 0; j < num_frames; ++j) {
-
-                                if (j == 0) {
-                                    buffer[0] = num_frames + '0';
-
-                                    while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
-                                        char aux[2];
-                                        aux[0] = data[data_index];
-                                        aux[1] = '\0';
-                                        strcat(buffer, aux);
-                                        ++data_index;
-                                    }
-                                }
-                                else {
-                                    while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
-                                        char aux[2];
-                                        aux[0] = data[data_index];
-                                        aux[1] = '\0';
-                                        strcat(buffer, aux);
-                                        ++data_index;
-                                    }
-                                }
-
-                                send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
-
-                                free(buffer);
-                                buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
-
-                            }
-
-
-
-
+                            listPlaylists(sockets_fd, i);
                         }
 
-                        //send_packet(sockets_fd[sockets_index], 2, )
                         break;
 
                 }
