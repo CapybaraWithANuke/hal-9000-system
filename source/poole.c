@@ -290,14 +290,14 @@ int main(int argc, char *argv[]) {
 
     Packet packet = read_packet(discovery_fd);
 
-    while (packet.header[4] == 'K') {
-        char* frame_data = calloc(2, sizeof(char));
+    while (!strcmp(packet.header, "CON_KO")) {
+        char* frame_data = calloc(strlen(poole.server_name)+strlen(poole.poole_ip)+7, sizeof(char));
         strcat(frame_data, poole.server_name);
         strcat(frame_data, "&");
         strcat(frame_data, poole.poole_ip);
         strcat(frame_data, "&");
-        char* buffer;
-        asprintf(&buffer, "%d", poole.poole_port);
+        char* buffer = calloc(5, sizeof(char));
+        sprintf(buffer, "%d", poole.poole_port);
         strcat(frame_data, buffer);
         free(buffer);
         

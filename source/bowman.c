@@ -256,7 +256,6 @@ int system_connect() {
 void list_songs() {
 
 	int i = 1;
-	int finished = 0;
 	char* input;
 	char** song_name = (char**) calloc(1, sizeof(char*));
 	int num_songs = 0;
@@ -282,7 +281,7 @@ void list_songs() {
 			logn("There has been an error listing the songs");
 			return;
 		}
-		input = (char*) realloc((i*data_size)+1, sizeof(char));
+		input = (char*) realloc(input, (i*data_size)+1*sizeof(char));
 		strcat(input, packet.data);
 		i++;
 	} while (packet.data[data_size-1] != '\0');
