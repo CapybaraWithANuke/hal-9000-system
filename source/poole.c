@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -12,8 +13,11 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <math.h>
+#include <pthread.h>
 
 #include "../header/commonfuncs.h"
+#include "../header/semaphore_v2.h"
+
 
 #define print(x) write(1, x, strlen(x));
 
@@ -45,35 +49,19 @@ typedef struct {
     char** songs;
 } Playlist;
 
+typedef struct {
+    int fd;
+    char* song;
+    int thread_num;
+} Thread_input;
+
 Poole poole;
-const char songs[SONG_COUNT][MAX_SONG_LENGTH] = {"despacito", "sway", "gimme chocolate", "oregon boyz", "nowhere to go"};
-Playlist playlists[PLAYLIST_COUNT];
-
-void initializePlaylists() {
-
-    playlists[0].name = "Dolores";
-    playlists[1].name = "Mildred";
-    playlists[2].name = "Flux";
-
-    playlists[0].num_songs = 2;
-    playlists[1].num_songs = 3;
-    playlists[2].num_songs = 2;
-
-    playlists[0].songs = (char**) malloc(sizeof(char*)*2);
-    playlists[1].songs = (char**) malloc(sizeof(char*)*3);
-    playlists[2].songs = (char**) malloc(sizeof(char*)*2);
-
-    playlists[0].songs[0] = "despacito";
-    playlists[0].songs[1] = "sway";
-
-    playlists[1].songs[0] = "idk";
-    playlists[1].songs[1] = "what to invent";
-    playlists[1].songs[2] = "anymore";
-    
-    playlists[2].songs[0] = "it's 6 AM";
-    playlists[2].songs[1] = "a.";
-
-}
+semaphore print_sem;
+semaphore thread_array_sem;
+pthread_t* threads;
+int* thread_fin;
+Thread_input* inputs;
+int num_threads = 0;
 
 void free_everything(){
     free(poole.server_name);
@@ -82,7 +70,7 @@ void free_everything(){
     free(poole.poole_ip);
 }
 
-int setupSocket(char* ip, int port, int server_fd) {
+int setup_socket(char* ip, int port, int server_fd) {
 
     struct sockaddr_in address;
     socklen_t addrlen;
@@ -103,121 +91,252 @@ int setupSocket(char* ip, int port, int server_fd) {
     }
 
     return 1;
-
 }
 
-void listSongs(int* sockets_fd, int i) {
+void protected_logn(semaphore* sem, char* x) {
+	SEM_wait(sem);
+	logn(x);
+	SEM_signal(sem);
+}
 
-    char* data = (char*) calloc((SONG_COUNT * 2 - 1) + 1, sizeof(char));
+void list_songs(int fd) {
 
-    for (int j = 0; j < SONG_COUNT; ++j) {
-        strcat(data, songs[j]);
-        if (j != (SONG_COUNT-1)) strcat(data, "&");
+    int ffd = open("poole_music/song_names", O_RDONLY);
+    if (ffd < 0){
+        perror("Error: unable to get songs\n");
+        send_packet(fd, 2, "SONGS_RESPONSE", "");
+        return;
+    }
+
+    char* songs = (char*) calloc(1, sizeof(char));
+    songs[0] = '\0';
+    char* song_name = (char*) calloc(1, sizeof(char));
+
+    do {
+        free(song_name);
+        song_name = read_until(ffd, ' ');
+        free(song_name);
+        song_name = read_until(ffd, '\n');
+        remove_symbol(song_name, '\r');
+        debug(song_name);
+        songs = (char*) realloc(songs, (strlen(songs) + 2 + strlen(song_name))*sizeof(char));
+
+        if (songs[0] != '\0') {
+            strcat(songs, "&");
+        }
+        strcat(songs, song_name);
+    } while(song_name[0] != '\0');
+
+    send_packet(fd, 2, "SONGS_RESPONSE", songs);
+    free(songs);
+    close(ffd);
+}
+
+void list_playlists(int fd) {
+
+    int ffd = open("poole_music/playlists", O_RDONLY);
+    if (ffd < 0){
+        perror("Error: unable to get playlists\n");
+    }
+
+    char* string = (char*) calloc(1, sizeof(char));
+    string[0] = '\0';
+    char* buffer;
+
+    do {
+        buffer = read_until(ffd, '-');
+        log("playlist: "); debug(buffer);
+        if (buffer[0] == '\0') {
+            break;
+        }
+        string = (char*) realloc(string, (strlen(string) + 2 + strlen(buffer))*sizeof(char));
+        
+        log("char0: "); write(1, &string[0], sizeof(char)); logn("");
+        if (string[0] != '\0') {
+            strcat(string, "#");
+        }
+        strcat(string, buffer);
+        debug(string);
+
+        do {
+            free(buffer);
+            buffer = read_until(ffd, ' ');
+            free(buffer);
+            buffer = read_until2(ffd, ',', '\n');
+            remove_symbol(buffer, '\r');
+            log("buffer: "); debug(buffer);
+
+            if (buffer[0] == '\0') {
+                break;
+            }
+            string = (char*) realloc(string, (strlen(string) + 2 + strlen(buffer))*sizeof(char));
+            
+            strcat(string, "&");
+            strcat(string, buffer);
+            debug(string);
+        } while(1);
+        free(buffer);
+    } while(1);
+
+    debug(string);
+    send_packet(fd, 2, "SONGS_RESPONSE", string);
+    free(string);
+    close(ffd);
+}
+
+void signal_thread_end(int thread_num) {
+    SEM_wait(&thread_array_sem);
+    thread_fin[thread_num] = 1;
+    SEM_signal(&thread_array_sem);
+}
+
+void* send_song(void* in) {
+
+    Thread_input* input_p = (Thread_input*) in;
+    int fd = (*input_p).fd;
+    char* song = (*input_p).song;
+    int thread_num = (*input_p).thread_num;
+
+    char* path = "../poole_music/song_names";
+    int songs_ffd = open(path, O_RDONLY);
+    if (songs_ffd == -1){
+        signal_thread_end(thread_num);
+        return NULL;
     }
     
-    //One additional byte reserved for the number of frames
-    int num_frames = ceil(strlen(data)*1.0/(256 - 4 - strlen("SONGS_RESPONSE")));
-    int data_index = 0;
+    char* id = (char*) calloc(1, sizeof(char));
+    char* buffer = (char*) calloc(1, sizeof(char));
+    int found = 0;
 
-    for (int j = 0; j < num_frames; ++j) {
+    do {
+        free(id);
+        free(buffer);
 
-        char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE"))+1, sizeof(char));
-        
-        if (j == 0) {
-            buffer[0] = num_frames + '0';
-            while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
-                char aux[2];
-                aux[0] = data[data_index];
-                aux[1] = '\0';
-                strcat(buffer, aux);
-                ++data_index;
-            }
-        
-            send_packet(2, strlen("SONGS_RESPONSE"), "SONGS_RESPONSE", buffer);
-            
+        id = read_until(fd, ' ');
+        buffer = read_until(fd, '\n');
+        remove_symbol(buffer, '\r');
+
+        if (!strcmp(buffer, song)) {
+            found = 1;
+            break;
         }
-        else {
-            while ((strlen(buffer) <= (256 - 3 - strlen("SONGS_RESPONSE"))) && data[data_index] != '\0') {
-                char aux[2];
-                aux[0] = data[data_index];
-                aux[1] = '\0';
-                strcat(buffer, aux);
-                ++data_index;
-            }
+    } while(buffer[0] != '\0');
 
-            send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
-
-        }
-
+    close(songs_ffd);
+    if (!found) {
+        free(buffer);
+        free(id);
+        signal_thread_end(thread_num);
+        return NULL;
     }
 
+    path = "../poole_music/song_files/";
+    path = (char*) realloc(path, (strlen(path)+1+strlen(song))*sizeof(char));
+    strcat(path, song);
 
+    char* md5sum = get_md5sum(path);
+
+    struct stat file_info;
+    if (stat(path, &file_info) == -1) {
+        signal_thread_end(thread_num);
+        return NULL;
+    }
+    char* filesize;
+    asprintf(&filesize, "%ld", file_info.st_size);
+
+    buffer = (char*) realloc(buffer, (strlen(buffer) + strlen(filesize) + strlen(md5sum) + strlen(id)*sizeof(char)));
+    strcat(buffer, filesize);
+    strcat(buffer, md5sum);
+    strcat(buffer, id);
+    send_packet(fd, 4, "NEW_FILE", buffer);
+    free(buffer);
+
+    int ffd = open(path, O_RDONLY);
+    if (ffd == -1){
+        send_packet(fd, 3, "ERROR_FILE", "");
+        signal_thread_end(thread_num);
+        return NULL;
+    }
+    int data_length = 256 - 3 - strlen("FILE_DATA") - sizeof(short);
+    char* data = (char*) calloc(data_length + 2 + 2, sizeof(char));
+    int id_int = atoi(id);
+
+    for (int i=0; i<file_info.st_size; i=i+data_length) {
+        read(ffd, buffer, sizeof(char)*data_length);
+        data[0] = (char) id_int / 256;
+        data[1] = (char) id_int % 256;
+        data[2] = '&';
+        data[3] = '\0';
+        strcat(data, buffer);
+        send_packet(ffd, 4, "FILE_DATA", data);
+        free(buffer);
+    }
+    signal_thread_end(thread_num);
+    return NULL;
 }
 
-void listPlaylists(int* sockets_fd, int i) {
+int send_playlist(int fd, char* playlist) {
 
-    char* data = (char*) calloc(2, sizeof(char));
+    char* path = "../poole_music/playlists";
+    int playlist_ffd = open(path, O_RDONLY);
+    if (playlist_ffd == -1){
+        return -1;
+    }
 
-    for (int j = 0; j < PLAYLIST_COUNT; ++j) {
+    int num_songs = 0;
+    char* playlist_file = (char*) calloc(1, sizeof(char));
+    playlist_file[0] = '\0';
+    char* buffer;
+    char** songs;
 
-        strcat(data, playlists[j].name);
-        strcat(data, "&");
+    do {
+        free(playlist_file);
+        playlist_file = read_until(playlist_ffd, '-');
+        if (playlist_file[0] == '\0') {
+            break;
+        }
 
-        for (int k = 0; k < playlists[j].num_songs; ++k) {
+        do {
+            buffer = read_until(playlist_ffd, ' ');
+            free(buffer);
+            buffer = read_until2(playlist_ffd, ',', '\n');
+            remove_symbol(buffer, '\r');
 
-            strcat(data, playlists[j].songs[k]);
-
-
-            if (k < (playlists[j].num_songs-1)) {
-                strcat(data, "&");
+            if (buffer[0] == '\0') {
+                free(buffer);
+                break;
+            }
+            if (!strcmp(playlist, playlist_file)) {
+                songs = (char**) realloc(songs, ++num_songs*sizeof(char*));
+                songs[num_songs-1] = buffer;
             }
             else {
-                strcat(data, "#");
+                free(buffer);
             }
+        } while(1);
+    } while(strcmp(playlist, playlist_file));
+    free(playlist_file);
 
-        }
+    log(". A total of "); logi(num_songs); logn(" songs will be sent.");
+    SEM_signal(&print_sem);
 
+    for (int i=0; i<num_songs; i++) {
+        SEM_wait(&thread_array_sem);
+        inputs = (Thread_input*) realloc(inputs, ++num_threads*sizeof(char));
+        inputs[num_threads-1].fd = fd;
+        inputs[num_threads-1].song = songs[i];
+        inputs[num_threads-1].thread_num = num_threads - 1;
 
+        threads = (pthread_t*) realloc(threads, num_threads*sizeof(pthread_t));
+        thread_fin = (int*) realloc(thread_fin, num_threads*sizeof(int));
+        thread_fin[num_threads-1] = 0;
+        pthread_create(&threads[num_threads-1], NULL, send_song, (void*) &inputs[num_threads-1]);
+        SEM_signal(&thread_array_sem);
     }
-
-    int num_frames = ceil(strlen(data)/(256 - 4 - strlen("SONGS_RESPONSE")));
-    char* buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
-    int data_index = 0;
-    for (int j = 0; j < num_frames; ++j) {
-
-        if (j == 0) {
-            buffer[0] = num_frames + '0';
-
-            while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
-                char aux[2];
-                aux[0] = data[data_index];
-                aux[1] = '\0';
-                strcat(buffer, aux);
-                ++data_index;
-            }
-        }
-        else {
-            while (strlen(buffer) < (256 - 4 - strlen("SONGS_RESPONSE")) && data[data_index] != '\0') {
-                char aux[2];
-                aux[0] = data[data_index];
-                aux[1] = '\0';
-                strcat(buffer, aux);
-                ++data_index;
-            }
-        }
-
-        send_packet(sockets_fd[i], 2, "SONGS_RESPONSE", buffer);
-
-        free(buffer);
-        buffer = (char*) calloc((256 - 3 - strlen("SONGS_RESPONSE") + 1), sizeof(char));
-
-    }
-
+    return -1;
 }
 
 int main(int argc, char *argv[]) {
-
-    initializePlaylists();
 	
     char* string;
 	const char* file_path_start = "config/";
@@ -348,14 +467,23 @@ int main(int argc, char *argv[]) {
     int sockets_index = 0;
     int nfds = server_fd+1;
 
-    setupSocket(poole.poole_ip, poole.poole_port, server_fd);
+    setup_socket(poole.poole_ip, poole.poole_port, server_fd);
 
-    while(69) {
+    SEM_constructor(&print_sem);
+    SEM_constructor(&thread_array_sem);
+    SEM_init(&print_sem, 1);
+    SEM_init(&thread_array_sem, 1);
+
+    while(1) {
 
         FD_ZERO(&set);
         FD_SET(server_fd, &set);
         for (i = 0; i < sockets_index; i++) {
             FD_SET(sockets_fd[i], &set);
+
+            if (sockets_fd[i] + 1 > nfds) {
+                nfds = sockets_fd[i] + 1;
+            }
         }
 
         select(nfds, &set, NULL, NULL, NULL);
@@ -388,18 +516,73 @@ int main(int argc, char *argv[]) {
                         break;
                     case 2:
                         if (!strcmp(packet.header, "LIST_SONGS")) {
-                            listSongs(sockets_fd, i);
+                            SEM_wait(&print_sem);
+                            logn("New request - "); log(names_bowmans[i]); logn(" requires the list of songs.");
+                            log("Sending song list to "); logn(names_bowmans[i]);
+                            SEM_signal(&print_sem);
+                            list_songs(sockets_fd[i]);
                         }
-
                         else if (!strcmp(packet.header, "LIST_PLAYLISTS")) {
-                            listPlaylists(sockets_fd, i);
+                            SEM_wait(&print_sem);
+                            logn("New request - "); log(names_bowmans[i]); logn(" requires the list of playlists.");
+                            log("Sending playlist list to "); logn(names_bowmans[i]);
+                            SEM_signal(&print_sem); 
+                            list_playlists(sockets_fd[i]);
                         }
-
                         break;
+                    case 3:
+                        if (!strcmp(packet.header, "DOWNLOAD_SONG")) {
+                            SEM_wait(&print_sem);
+                            logn("New request - "); log(names_bowmans[i]); log(" want to download "); logn(packet.data);
+                            log("Sending "); log(packet.data); log(" to "); logn(names_bowmans[i]);
+                            SEM_signal(&print_sem);
 
+                            SEM_wait(&thread_array_sem);
+                            inputs = (Thread_input*) realloc(inputs, ++num_threads*sizeof(char));
+                            inputs[num_threads-1].fd = sockets_fd[i];
+                            inputs[num_threads-1].song = packet.data;
+                            inputs[num_threads-1].thread_num = num_threads - 1;
+
+                            threads = (pthread_t*) realloc(threads, num_threads*sizeof(pthread_t));
+                            thread_fin = (int*) realloc(thread_fin, num_threads*sizeof(int));
+                            thread_fin[num_threads-1] = 0;
+                            pthread_create(&threads[num_threads-1], NULL, send_song, (void*) &inputs[num_threads-1]);
+                            SEM_signal(&thread_array_sem);
+                        }
+                        else if (!strcmp(packet.header, "DOWNLOAD_LIST")) {
+                            SEM_wait(&print_sem);
+                            logn("New request - "); log(names_bowmans[i]); log(" want to download the playlist "); logn(packet.data);
+                            log("Sending "); log(packet.data); log(" to "); logn(names_bowmans[i]);
+                            send_playlist(sockets_fd[i], packet.data);
+                        }
+                        break;
+                    default:
+                        break;
                 }
             }
         }
+        int j = 0;
+
+        SEM_wait(&thread_array_sem);
+        for (i=0; i<num_threads-j; i++) {
+
+            if (thread_fin[i] == 1) {
+                pthread_join (threads[i], NULL);
+                j++;
+            }
+            threads[i] = threads[i+j];
+            thread_fin[i] = thread_fin[i+j];
+            inputs[i] = inputs[i+j];
+        }
+        if (j > 0) {
+            inputs = (Thread_input*) realloc(inputs, (num_threads-j)*sizeof(Thread_input));
+            threads = (pthread_t*) realloc(threads, (num_threads-j)*sizeof(pthread_t));
+            thread_fin = (int*) realloc(thread_fin, (num_threads-j)*sizeof(int));
+            num_threads = num_threads - j;
+        }
+        SEM_signal(&thread_array_sem);
+        debug("finished processing packet");
+        sleep(1);
     }
 
     free_everything();

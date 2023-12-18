@@ -129,7 +129,7 @@ void poole_request(int fd,int pos) {
             close(fd);
         }
         else {
-            send_packet(fd, 7, "CON_KO", "");
+            send_packet(fd, 7, "", "");
         }
         i++;
     } while (strcmp(packet.header, "NEW_POOLE") && strcmp(packet.header, "EXIT_POOLE"));
@@ -175,7 +175,7 @@ void redirect_bowman(int fd, int pos) {
                 bowman_fds = (int*) realloc(bowman_fds, sizeof(int)*num_bowman_fds);   
             }
             else {
-                send_packet(fd, 7, "CON_KO", "");
+                send_packet(fd, 7, "", "");
             }
         }
         else if (!strcmp(packet.header, "EXIT_BOWMAN")) {
@@ -188,7 +188,7 @@ void redirect_bowman(int fd, int pos) {
             close(fd);
 
             for (int i=0; i<num_pooles; i++){
-                if (!strcmp(poole_connections[i].name, packet.header)){
+                if (!strcmp(poole_connections[i].name, packet.data)){
                     poole_connections[i].num_clients--;
                     break;
                 }
