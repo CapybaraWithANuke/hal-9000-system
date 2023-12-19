@@ -407,12 +407,13 @@ void list_playlists() {
 	}	
 	for (i=0; i<num_playlists; i++) {
 		log("i: ");logni(i);
-		for (int j=0; j<num_songs[i]; j++) {
+		for (int j=1; j<num_songs[i]; j++) {
 			log("i: ");logi(i); log("   j: ");logni(j);
 			free(playlists[i][j]);
 		}
-		free(playlists[i]);
-	}	
+		//free(playlists[i]);
+	}
+
 	free(playlists);
 	free(num_songs);
 	free(input);
@@ -424,13 +425,11 @@ void download(char* string) {
 	char* argument = (char*) calloc(1, sizeof(char));
 	int i, j;
 
-	for (i=0; string[i-1] != ' ' ; i++);
-
-	for(j=0; string[i] != '\0'; i++) {
+	for(j=0, i=9; string[i] != '\0'; i++) {
 		argument[j] = string[i];
 		argument = (char*) realloc(argument, (++j + 1)*sizeof(char));
 	}
-	argument[j] = '\0';
+	argument[j+1] = '\0';
 
 	if (strlen(argument) > 4 && argument[strlen(argument)-4] == '.' && argument[strlen(argument)-3] == 'm' && 
 		argument[strlen(argument)-2] == 'p' && argument[strlen(argument)-1] == '3') {
@@ -497,7 +496,7 @@ void receive_file(Packet packet) {
 			songs[num_songs-1].playlist = (char*) calloc(strlen(playlist_name)+1, sizeof(char));
 			strcpy(songs[num_songs-1].playlist, playlist_name);
 		}
-		path = (char*) realloc(path, (strlen(path)+1+strlen(songs[num_songs-1].filename))*sizeof(char));
+		path = (char*) malloc((strlen(path)+1+strlen(songs[num_songs-1].filename))*sizeof(char));
 		strcat(path, songs[num_songs-1].filename);
 
 		if (((songs[num_songs-1].fd) = open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) < 0) {
@@ -527,7 +526,7 @@ void receive_file(Packet packet) {
 		songs[i].current_filesize = songs[i].current_filesize + strlen(data);
 
 		path = "../bowman_music/song_files/";
-		path = (char*) realloc(path, (strlen(path)+1+strlen(songs[i].filename))*sizeof(char));
+		path = (char*) malloc((strlen(path)+1+strlen(songs[i].filename))*sizeof(char));
 		strcat(path, songs[i].filename);
 
 		if (data[data_size-1] == '\0') {
@@ -704,7 +703,6 @@ int main(int argc, char *argv[]){
 		print(1, "\n$ ");
 		string = read_until(0, '\n');
 		command = check_command(string);
-		free(string);
 		if (command == INVALID_COMMAND){
 			print(2, "ERROR: Please input a valid command.\n");
 		}
@@ -732,6 +730,7 @@ int main(int argc, char *argv[]){
 					list_playlists();
 					break;
 				case DOWNLOAD :
+					logn(string);
 					download(string);
 					break;
 				case CHECK_DOWNLOADS :

@@ -223,7 +223,7 @@ void* send_song(void* in) {
     }
 
     path = "../poole_music/song_files/";
-    path = (char*) realloc(path, (strlen(path)+1+strlen(song))*sizeof(char));
+    path = (char*) malloc((strlen(path)+1+strlen(song))*sizeof(char));
     strcat(path, song);
 
     char* md5sum = get_md5sum(path);
