@@ -42,6 +42,7 @@ char * read_until2(int fd, char end1, char end2) {
 		}
 	}
 	string[i] = '\0';
+	debug("");
 	return string;
 }
 

@@ -336,7 +336,6 @@ void list_songs() {
 		logi(i+1); log(". "); log(song_name[i]); logn("");
 		free(song_name[i]);
 	}
-	logn("");
 
 	free(song_name);
 	free(input);
@@ -377,6 +376,7 @@ void list_playlists() {
 		else if (input[i] == '#') {
 			playlists[num_playlists][num_songs[num_playlists]][num_char] ='\0';
 			num_char = 0;
+			num_songs[num_playlists]++;
 			playlists = (char***) realloc(playlists, (++num_playlists + 1)*sizeof(char**));
 			playlists[num_playlists] = (char**) calloc(1, sizeof(char*));
 			playlists[num_playlists][0] = (char*) calloc(1, sizeof(char));
@@ -398,11 +398,17 @@ void list_playlists() {
 
 	for (i=0; i<num_playlists; i++) {
 		logi(i+1); log(". "); logn(playlists[i][0]);
-		free(playlists[i][0]);
+
 		for (int j=1; j<num_songs[i]; j++) {
 			asprintf(&buffer, "\t%c. %s\n", (char)('a'+j-1), playlists[i][j]);
 			log(buffer);
 			free(buffer);
+		}
+	}	
+	for (i=0; i<num_playlists; i++) {
+		log("i: ");logni(i);
+		for (int j=0; j<num_songs[i]; j++) {
+			log("i: ");logi(i); log("   j: ");logni(j);
 			free(playlists[i][j]);
 		}
 		free(playlists[i]);
@@ -690,12 +696,12 @@ int main(int argc, char *argv[]){
 	remove_symbol(config.port, '\r');
 	close(fd_config);
 
-	asprintf(&string, "%s user has been initialized\n\n", config.user);
-	print(1, string);
+	asprintf(&string, "%s user has been initialized", config.user);
+	logn(string);
 	free(string);
 
 	while (command != LOG_OUT){
-		print(1, "$ ");
+		print(1, "\n$ ");
 		string = read_until(0, '\n');
 		command = check_command(string);
 		free(string);

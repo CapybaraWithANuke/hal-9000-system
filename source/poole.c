@@ -118,7 +118,6 @@ void list_songs(int fd) {
         free(song_name);
         song_name = read_until(ffd, '\n');
         remove_symbol(song_name, '\r');
-        debug(song_name);
         songs = (char*) realloc(songs, (strlen(songs) + 2 + strlen(song_name))*sizeof(char));
 
         if (songs[0] != '\0') {
@@ -145,40 +144,33 @@ void list_playlists(int fd) {
 
     do {
         buffer = read_until(ffd, '-');
-        log("playlist: "); debug(buffer);
         if (buffer[0] == '\0') {
             break;
         }
         string = (char*) realloc(string, (strlen(string) + 2 + strlen(buffer))*sizeof(char));
         
-        log("char0: "); write(1, &string[0], sizeof(char)); logn("");
         if (string[0] != '\0') {
             strcat(string, "#");
         }
         strcat(string, buffer);
-        debug(string);
 
         do {
             free(buffer);
-            buffer = read_until(ffd, ' ');
-            free(buffer);
-            buffer = read_until2(ffd, ',', '\n');
+            buffer = read_until2(ffd, ' ', '\n');
             remove_symbol(buffer, '\r');
-            log("buffer: "); debug(buffer);
-
             if (buffer[0] == '\0') {
                 break;
             }
+            free(buffer);
+            buffer = read_until(ffd, ',');
+
             string = (char*) realloc(string, (strlen(string) + 2 + strlen(buffer))*sizeof(char));
-            
             strcat(string, "&");
             strcat(string, buffer);
-            debug(string);
         } while(1);
         free(buffer);
     } while(1);
 
-    debug(string);
     send_packet(fd, 2, "SONGS_RESPONSE", string);
     free(string);
     close(ffd);
