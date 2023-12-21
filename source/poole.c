@@ -548,6 +548,21 @@ int main(int argc, char *argv[]) {
                             send_playlist(sockets_fd[i], packet.data);
                         }
                         break;
+                    case 6:
+                        if (!strcmp(packet.header, "EXIT")) {
+                            send_packet(sockets_fd[i], 6, "CONOK", "");
+                            close(sockets_fd[i]);
+                            
+                            int k=0;
+                            for (int j=0; j<sockets_index-k; j++) {
+                                if (i == j){
+                                    k++;
+                                }
+                                sockets_fd[j] = sockets_fd[j+k];
+                            }
+                            sockets_index = sockets_index - k;
+                        }
+                        break;
                     default:
                         break;
                 }
