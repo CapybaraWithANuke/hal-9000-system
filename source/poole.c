@@ -27,6 +27,12 @@
 #define ERR_LISTEN "Error: listening failed"
 #define ERR_ACCEPT "Error: accepting failed"
 
+#define ERR_PID "Error: fork not created"
+
+#define ERR_PIPE "Error: pipe not created"
+
+#define ERR_STATS "Error: stats file not opened"
+
 #define ERR -1
 
 #define PLAYLIST_COUNT 3
@@ -48,6 +54,11 @@ typedef struct {
     int num_songs;
     char** songs;
 } Playlist;
+
+typedef struct {
+    char* name;
+    int num_downloads;
+} Song;
 
 typedef struct {
     int fd;
@@ -328,6 +339,74 @@ int send_playlist(int fd, char* playlist) {
     return -1;
 }
 
+void monolith(int fd_pipe) {
+
+    //while(1) {
+
+        char* song_name;
+        song_name = read_until(fd_pipe, '\0');
+
+        int fd = open("stats.txt", O_RDONLY);
+
+        if (fd < 0) {
+            logn(ERR_STATS);
+            exit(ERR);
+        }
+
+        Song* songs = (Song*) malloc(1*sizeof(Song));
+        char* current_word = "a";
+        int i = 0;
+
+        while (strcmp(current_word, "\0")) {
+            
+            songs = (Song*) realloc(songs, (i+1)*sizeof(Song));
+            current_word = read_until(fd, ',');
+            songs[i].name = (char*) malloc(strlen(current_word)*sizeof(char));
+            strcpy(songs[i].name, current_word);
+            current_word = read_until(fd, '\n');
+            songs[i].num_downloads = atoi(current_word);
+
+            if (!strcmp(songs[i].name, song_name)) {
+                ++songs[i].num_downloads;
+            }
+
+            ++i;
+        }
+
+        close(fd);
+
+        int ffd = open("stats.txt", O_TRUNC | O_WRONLY);
+        if (ffd == -1) {
+            logn(ERR_STATS);
+            exit(ERR);
+        }
+
+        write(ffd, "Hello.", 6);
+        
+
+        close(ffd);
+/*
+        for (int j = 0; j < i; ++j) {
+
+            write(fd, songs[j].name, strlen(songs[j].name));
+            write(fd, ",", 1);
+            char* num_downloads_string;
+            asprintf(&num_downloads_string, "%d", songs[j].num_downloads);
+            write(fd, num_downloads_string, strlen(num_downloads_string));
+            write(fd, "\n", 1);
+            logn(songs[j].name);
+            logni(songs[j].num_downloads);
+            logn(num_downloads_string);
+
+        }
+*/
+        close(fd);
+
+   // }
+    close(fd_pipe);
+    return;
+}
+
 int main(int argc, char *argv[]) {
 	
     char* string;
@@ -383,6 +462,33 @@ int main(int argc, char *argv[]) {
     if (connect(discovery_fd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         logn(ERR_CONNECT);
         return ERR;
+    }
+
+    int pip[2];
+    if (pipe(pip) < 0) {
+        logn(ERR_PIPE);
+        return ERR;
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        logn(ERR_PID);
+        return ERR;
+    }
+
+    if (pid == 0) {
+        close(pip[1]);
+        monolith(pip[0]);
+        exit (-1);
+    }
+    else {
+        close(pip[0]);
+        char* buffer;
+        asprintf(&buffer, "ping");
+        write(pip[1], buffer, 5);
+        free(buffer);
+        
     }
 
     char* frame_data = calloc(2, sizeof(char));
