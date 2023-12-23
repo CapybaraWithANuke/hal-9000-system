@@ -69,10 +69,13 @@ typedef struct {
 Poole poole;
 semaphore print_sem;
 semaphore thread_array_sem;
+semaphore stats_file;
+semaphore write_pipe;
 pthread_t* threads;
 int* thread_fin;
 Thread_input* inputs;
 int num_threads = 0;
+int pip[2];
 
 void free_everything(){
     free(poole.server_name);
@@ -199,6 +202,13 @@ void* send_song(void* in) {
     int fd = (*input_p).fd;
     char* song = (*input_p).song;
     int thread_num = (*input_p).thread_num;
+
+    char* song_name = calloc(strlen(song)+1, sizeof(char));
+    strcpy(song_name, song);
+    song_name[strlen(song_name)-4] = '\0';
+    //logn(song_name);
+    write(pip[1], song_name, strlen(song_name)+1);
+    SEM_signal(&write_pipe);
 
     char* path = "../poole_music/song_names";
     int songs_ffd = open(path, O_RDONLY);
@@ -344,8 +354,11 @@ void monolith(int fd_pipe) {
     //while(1) {
 
         char* song_name;
+
+        SEM_wait(&write_pipe);
         song_name = read_until(fd_pipe, '\0');
 
+        SEM_wait(&stats_file);
         int fd = open("stats.txt", O_RDONLY);
 
         if (fd < 0) {
@@ -375,18 +388,9 @@ void monolith(int fd_pipe) {
 
         close(fd);
 
-        int ffd = open("stats.txt", O_TRUNC | O_WRONLY);
-        if (ffd == -1) {
-            logn(ERR_STATS);
-            exit(ERR);
-        }
+        fd = open("stats.txt", O_TRUNC | O_WRONLY);
 
-        write(ffd, "Hello.", 6);
-        
-
-        close(ffd);
-/*
-        for (int j = 0; j < i; ++j) {
+        for (int j = 0; j < (i-1); ++j) {
 
             write(fd, songs[j].name, strlen(songs[j].name));
             write(fd, ",", 1);
@@ -394,13 +398,12 @@ void monolith(int fd_pipe) {
             asprintf(&num_downloads_string, "%d", songs[j].num_downloads);
             write(fd, num_downloads_string, strlen(num_downloads_string));
             write(fd, "\n", 1);
-            logn(songs[j].name);
-            logni(songs[j].num_downloads);
-            logn(num_downloads_string);
 
         }
-*/
+        
         close(fd);
+        SEM_signal(&stats_file);
+        free(song_name);
 
    // }
     close(fd_pipe);
@@ -464,7 +467,9 @@ int main(int argc, char *argv[]) {
         return ERR;
     }
 
-    int pip[2];
+    SEM_constructor(&write_pipe);
+    SEM_init(&write_pipe, 0);
+
     if (pipe(pip) < 0) {
         logn(ERR_PIPE);
         return ERR;
@@ -479,15 +484,17 @@ int main(int argc, char *argv[]) {
 
     if (pid == 0) {
         close(pip[1]);
+        SEM_constructor_with_name(&stats_file, ftok("stats.txt", 1));
+        SEM_init(&stats_file, 1);
         monolith(pip[0]);
         exit (-1);
     }
     else {
         close(pip[0]);
-        char* buffer;
-        asprintf(&buffer, "ping");
-        write(pip[1], buffer, 5);
-        free(buffer);
+        // char* buffer;
+        // asprintf(&buffer, "ingobernable");
+        // write(pip[1], buffer, strlen(buffer)+1);
+        // free(buffer);
         
     }
 
