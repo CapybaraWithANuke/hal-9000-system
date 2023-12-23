@@ -351,12 +351,14 @@ int send_playlist(int fd, char* playlist) {
 
 void monolith(int fd_pipe) {
 
-    //while(1) {
+    char* song_name;
 
-        char* song_name;
+    while(1) {
+
 
         SEM_wait(&write_pipe);
         song_name = read_until(fd_pipe, '\0');
+        logn(song_name);
 
         SEM_wait(&stats_file);
         int fd = open("stats.txt", O_RDONLY);
@@ -403,9 +405,9 @@ void monolith(int fd_pipe) {
         
         close(fd);
         SEM_signal(&stats_file);
-        free(song_name);
 
-   // }
+    }
+    free(song_name);
     close(fd_pipe);
     return;
 }
