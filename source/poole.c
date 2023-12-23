@@ -71,6 +71,7 @@ semaphore print_sem;
 semaphore thread_array_sem;
 semaphore stats_file;
 semaphore write_pipe;
+semaphore monolith_ready;
 pthread_t* threads;
 int* thread_fin;
 Thread_input* inputs;
@@ -207,6 +208,7 @@ void* send_song(void* in) {
     strcpy(song_name, song);
     song_name[strlen(song_name)-4] = '\0';
     //logn(song_name);
+    SEM_wait(&monolith_ready);
     write(pip[1], song_name, strlen(song_name)+1);
     SEM_signal(&write_pipe);
 
@@ -355,7 +357,7 @@ void monolith(int fd_pipe) {
 
     while(1) {
 
-
+        SEM_signal(&monolith_ready);
         SEM_wait(&write_pipe);
         song_name = read_until(fd_pipe, '\0');
         logn(song_name);
@@ -471,6 +473,8 @@ int main(int argc, char *argv[]) {
 
     SEM_constructor(&write_pipe);
     SEM_init(&write_pipe, 0);
+    SEM_constructor(&monolith_ready);
+    SEM_init(&monolith_ready, 0);
 
     if (pipe(pip) < 0) {
         logn(ERR_PIPE);
