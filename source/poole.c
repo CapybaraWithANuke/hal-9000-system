@@ -24,6 +24,12 @@
 #define ERR_LISTEN "Error: listening failed"
 #define ERR_ACCEPT "Error: accepting failed"
 
+#define ERR_PID "Error: fork not created"
+
+#define ERR_PIPE "Error: pipe not created"
+
+#define ERR_STATS "Error: stats file not opened"
+
 #define ERR -1
 
 #define PLAYLIST_COUNT 3
@@ -47,6 +53,11 @@ typedef struct {
 } Playlist;
 
 typedef struct {
+    char* name;
+    int num_downloads;
+} Song;
+
+typedef struct {
     int fd;
     char* song;
     int thread_num;
@@ -55,11 +66,18 @@ typedef struct {
 Poole poole;
 semaphore print_sem;
 semaphore thread_array_sem;
+<<<<<<< HEAD
 semaphore packet_sem;
+=======
+semaphore stats_file;
+semaphore write_pipe;
+semaphore monolith_ready;
+>>>>>>> f2e468a696bb1b027c570be4e7b7fe69d40135b3
 pthread_t* threads;
 int* thread_fin;
 Thread_input* inputs;
 int num_threads = 0;
+int pip[2];
 
 void free_everything(){
     free(poole.server_name);
@@ -195,9 +213,22 @@ void* send_song(void* in) {
     Thread_input* input_p = (Thread_input*) in;
     int fd = (*input_p).fd;
     int thread_num = (*input_p).thread_num;
+<<<<<<< HEAD
     char* song = (*input_p).song;
     char* path = (char*) calloc(strlen("poole_music/song_names")+1, sizeof(char));
     strcpy(path, "poole_music/song_names");
+=======
+
+    char* song_name = calloc(strlen(song)+1, sizeof(char));
+    strcpy(song_name, song);
+    song_name[strlen(song_name)-4] = '\0';
+    //logn(song_name);
+    SEM_wait(&monolith_ready);
+    write(pip[1], song_name, strlen(song_name)+1);
+    SEM_signal(&write_pipe);
+
+    char* path = "../poole_music/song_names";
+>>>>>>> f2e468a696bb1b027c570be4e7b7fe69d40135b3
     int songs_ffd = open(path, O_RDONLY);
     if (songs_ffd == -1){
         signal_thread_end(thread_num);
@@ -360,6 +391,69 @@ void send_playlist(int fd, char* playlist) {
     return;
 }
 
+void monolith(int fd_pipe) {
+
+    char* song_name;
+
+    while(1) {
+
+        SEM_signal(&monolith_ready);
+        SEM_wait(&write_pipe);
+        song_name = read_until(fd_pipe, '\0');
+        logn(song_name);
+
+        SEM_wait(&stats_file);
+        int fd = open("stats.txt", O_RDONLY);
+
+        if (fd < 0) {
+            logn(ERR_STATS);
+            exit(ERR);
+        }
+
+        Song* songs = (Song*) malloc(1*sizeof(Song));
+        char* current_word = "a";
+        int i = 0;
+
+        while (strcmp(current_word, "\0")) {
+            
+            songs = (Song*) realloc(songs, (i+1)*sizeof(Song));
+            current_word = read_until(fd, ',');
+            songs[i].name = (char*) malloc(strlen(current_word)*sizeof(char));
+            strcpy(songs[i].name, current_word);
+            current_word = read_until(fd, '\n');
+            songs[i].num_downloads = atoi(current_word);
+
+            if (!strcmp(songs[i].name, song_name)) {
+                ++songs[i].num_downloads;
+            }
+
+            ++i;
+        }
+
+        close(fd);
+
+        fd = open("stats.txt", O_TRUNC | O_WRONLY);
+
+        for (int j = 0; j < (i-1); ++j) {
+
+            write(fd, songs[j].name, strlen(songs[j].name));
+            write(fd, ",", 1);
+            char* num_downloads_string;
+            asprintf(&num_downloads_string, "%d", songs[j].num_downloads);
+            write(fd, num_downloads_string, strlen(num_downloads_string));
+            write(fd, "\n", 1);
+
+        }
+        
+        close(fd);
+        SEM_signal(&stats_file);
+
+    }
+    free(song_name);
+    close(fd_pipe);
+    return;
+}
+
 int main(int argc, char *argv[]) {
 	
     char* string;
@@ -422,7 +516,44 @@ int main(int argc, char *argv[]) {
     char* buffer;
     asprintf(&buffer, "%d", poole.poole_port);
 
+<<<<<<< HEAD
     char* frame_data = calloc(strlen(poole.server_name)+strlen(poole.poole_ip)+strlen(buffer)+3, sizeof(char));
+=======
+    SEM_constructor(&write_pipe);
+    SEM_init(&write_pipe, 0);
+    SEM_constructor(&monolith_ready);
+    SEM_init(&monolith_ready, 0);
+
+    if (pipe(pip) < 0) {
+        logn(ERR_PIPE);
+        return ERR;
+    }
+
+    pid_t pid = fork();
+
+    if (pid < 0) {
+        logn(ERR_PID);
+        return ERR;
+    }
+
+    if (pid == 0) {
+        close(pip[1]);
+        SEM_constructor_with_name(&stats_file, ftok("stats.txt", 1));
+        SEM_init(&stats_file, 1);
+        monolith(pip[0]);
+        exit (-1);
+    }
+    else {
+        close(pip[0]);
+        // char* buffer;
+        // asprintf(&buffer, "ingobernable");
+        // write(pip[1], buffer, strlen(buffer)+1);
+        // free(buffer);
+        
+    }
+
+    char* frame_data = calloc(2, sizeof(char));
+>>>>>>> f2e468a696bb1b027c570be4e7b7fe69d40135b3
     strcat(frame_data, poole.server_name);
     strcat(frame_data, "&");
     strcat(frame_data, poole.poole_ip);
