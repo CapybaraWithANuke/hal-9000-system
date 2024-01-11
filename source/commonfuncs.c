@@ -8,13 +8,14 @@
 #include "../header/commonfuncs.h"
 
 char* read_until(int fd, char end) {
-	char *string = string = (char *) malloc(sizeof(char));
-	char c;
-	int i = 0, size;
+
+	char* string = (char*) malloc(sizeof(char));
+	char c = 0;
+	int i = 0, size = 0;
 
 	while (1) {
 		size = read(fd, &c, sizeof(char));
-		if(c != end && size > 0){
+		if (c != end && size > 0) {
 			string = (char *) realloc(string, sizeof(char)*(i + 2));
 			string[i++] = c;
 		}
@@ -47,7 +48,7 @@ char * read_until2(int fd, char end1, char end2) {
 }
 
 void logn(char* x) {
-	char* x_new = (char*) calloc(1, strlen(x)+2);
+	char* x_new = (char*) calloc(strlen(x)+2, sizeof(char));
     strcat(x_new, x);
     strcat(x_new, "\n");
     log(x_new);
@@ -55,7 +56,7 @@ void logn(char* x) {
 }
 
 void debug(char* x) {
-	char* x_new = (char*) calloc(1, strlen(x)+2);
+	char* x_new = (char*) calloc(strlen(x)+2, sizeof(char));
     strcat(x_new, x);
     strcat(x_new, "\n");
     log(x_new);
@@ -76,6 +77,30 @@ void logni(int x) {
     free(buffer);
 }
 
+/*Packet read_packet(int fd) {
+
+	Packet new_packet;
+	short data_length;
+
+	read(fd, &(new_packet.type), sizeof(char));
+
+	read(fd, &(new_packet.empty), sizeof(char));
+	read(fd, &(new_packet.empty), sizeof(char));
+	new_packet.header_length = (int) new_packet.empty;
+
+	new_packet.header = (char*) calloc((new_packet.header_length+1), sizeof(char));
+	data_length = 256 - 3 - new_packet.header_length;
+	new_packet.data = (char*) calloc((data_length+1), sizeof(char));
+
+	read(fd, new_packet.header, (new_packet.header_length) * sizeof(char));
+	new_packet.header[new_packet.header_length] = '\0';
+
+	read(fd, new_packet.data, data_length * sizeof(char));
+	new_packet.data[data_length] = '\0';
+
+	return new_packet;
+}*/
+
 Packet read_packet(int fd) {
 	Packet new_packet;
 	short data_length;
@@ -87,9 +112,9 @@ Packet read_packet(int fd) {
 	read(fd, &new_packet.empty, sizeof(char));
 	new_packet.header_length = (int) new_packet.empty;
 
-	new_packet.header = (char*) malloc(sizeof(char)*(new_packet.header_length+1));
+	new_packet.header = (char*) calloc(new_packet.header_length+1, sizeof(char));
 	data_length = 256 - 3 - new_packet.header_length;
-	new_packet.data = (char*) malloc(sizeof(char)*(data_length+1));
+	new_packet.data = (char*) calloc(data_length+1, sizeof(char));
 
 	for (i=0; i<new_packet.header_length; i++){
 		read(fd, &new_packet.header[i], sizeof(char));
@@ -100,9 +125,8 @@ Packet read_packet(int fd) {
 		read(fd, &new_packet.data[i], sizeof(char));
 	}
 	new_packet.data[i] = '\0';
-
+	
 	return new_packet;
-
 }
 
 void fill_with(char symbol, char* data, int size) {
@@ -111,6 +135,47 @@ void fill_with(char symbol, char* data, int size) {
 		data[i] = symbol;
 	}
 }
+
+/*void send_packet(int fd, int type, char* header, char*data) {
+
+	int i = 0;
+	int data_length = 256 - 3 - strlen(header);
+	int bytes_left = strlen(data)+1;
+	char* new_data = data;
+	char* packet = (char*) calloc(256, sizeof(char));
+
+	do {
+		packet[0] = (char) type;
+		packet[1] = (char) 0;
+		packet[2] = (char) strlen(header);
+		packet[3] = '\0';
+		strcat(packet, header);
+
+		if (bytes_left <= data_length+1) {
+			
+			for (i=0; i<(int)strlen(new_data); i++) {
+				packet[3+strlen(header)+i] = new_data[i];
+			}
+			for (i=strlen(new_data); i<data_length; i++) {
+				packet[i] = '\0';
+			}
+		}
+		else {
+			for (i=0; i<data_length; i++) {
+				packet[3+strlen(header)+i] = new_data[i];
+			}
+		}
+		write(fd, packet, 256);
+
+		bytes_left = bytes_left - data_length;
+		if (bytes_left > 0)	{
+			new_data = new_data + data_length;
+		}
+		log("packet sent: "); debug(packet);
+	} while(bytes_left > 0);
+
+	free(packet);
+}*/
 
 void send_packet(int fd, int type, char* header, char*data) {
 
@@ -144,9 +209,41 @@ void send_packet(int fd, int type, char* header, char*data) {
 		if (bytes_left > 0)	{
 			new_data = new_data + data_length;
 		}
+		log("Packet sent: "); debug(header); debug(data);
 	} while(bytes_left > 0);
-	log("Packet sent: "); debug(header);
+}
 
+
+void send_file_packet(int fd, char* id, char*data) {
+
+	char* pack = (char*) calloc(257, sizeof(char));
+
+	pack[0] = (char) 4;
+	pack[1] = (char) 0;
+	pack[2] = (char) strlen("FILE_DATA");
+	pack[3] = 'F';
+	pack[4] = 'I';
+	pack[5] = 'L';
+	pack[6] = 'E';
+	pack[7] = '_';
+	pack[8] = 'D';
+	pack[9] = 'A';
+	pack[10] = 'T';
+	pack[11] = 'A';
+	pack[12] = id[0];
+	pack[13] = id[1];
+	pack[14] = '&';
+	pack[15] = '\0';
+	
+	int j=0;
+	for (int i=15; i<256; i++) {
+		pack[i] = data[j];
+		j++;
+	}
+	pack[256] = '\0';
+
+	write(fd, pack, 256*sizeof(char));
+	free(pack);
 }
 
 void remove_symbol(char* string, char symbol){

@@ -20,6 +20,7 @@ void logni(int x);
 void fill_with(char symbol, char* data, int size);
 Packet read_packet(int fd);
 void send_packet(int fd, int type, char* header, char*data);
+void send_file_packet(int fd, char* id, char*data);
 void remove_symbol(char* string, char symbol);
 char* get_md5sum(char* path);
 

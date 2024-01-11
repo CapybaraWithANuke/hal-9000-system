@@ -19,6 +19,7 @@
 #include <pthread.h>
 
 #include "../header/commonfuncs.h"
+#include "../header/semaphore_v2.h"
 
 #define print(x, y) write(x, y, strlen(y));
 #define LOG_OUT -3
@@ -52,13 +53,14 @@ typedef struct {
 int discovery_fd = -1;
 int poole_fd = -1;
 Config config;
-Song* songs;
+Song* songs = NULL;
 int num_songs = 0;
 int input_length = 0;
 char* playlist_name;
 pthread_t thread;
 char* input;
 int close_thread = 0;
+semaphore songs_sem;
 
 void exit_servers() {
 
@@ -317,6 +319,7 @@ void list_songs() {
 
 		if (input[i] == '\0'){
 			song_name[num_songs][num_char] ='\0';
+			num_songs++;
 			break;
 		}
 		else if (input[i] == '&'){
@@ -421,26 +424,20 @@ void download(char* string) {
 	char* argument = (char*) calloc(1, sizeof(char));
 	int i, j;
 
-	debug("in download");
-	debug(string);
-	for (i=0; string[i-1] != ' ' && i < (int) strlen(string); i++);
+	for (i=0; string[i] != ' '; i++);
+	i++;
 
-	debug("after space");
 	for(j=0; string[i] != '\0'; i++) {
 		argument[j] = string[i];
 		argument = (char*) realloc(argument, (++j + 1)*sizeof(char));
 	}
 	argument[j] = '\0';
 
-	debug("got song name");
-	debug(argument);
-
 	if (strlen(argument) > 4 && argument[strlen(argument)-4] == '.' && argument[strlen(argument)-3] == 'm' && 
 		argument[strlen(argument)-2] == 'p' && argument[strlen(argument)-1] == '3') {
 
 		playlist_name = NULL;
 		send_packet(poole_fd, 3, "DOWNLOAD_SONG", argument);
-		debug("requested song");
 	}
 	else {
 		playlist_name = argument;
@@ -487,15 +484,26 @@ void receive_file(Packet packet) {
 	char* path;
 
 	if (!strcmp(packet.header, "NEW_FILE")){
-		debug("NEW_FILE");
-		path = "../bowman_music/song_files/";
+		path = (char*) calloc(strlen("bowman_music/song_files/")+1, sizeof(char));
+    	strcpy(path, "bowman_music/song_files/");
 
-		songs = (Song*) realloc(songs, ++num_songs*sizeof(Song));
+		char* ptr;
+		SEM_wait(&songs_sem);
+		if (songs == NULL)
+			songs = (Song*) calloc(++num_songs, sizeof(Song));
+		else 
+			songs = (Song*) realloc(songs, ++num_songs*sizeof(Song));
 
-		songs[num_songs-1].filename = strtok(packet.data, "&");
-		songs[num_songs-1].filesize = strtol(strtok(NULL, "&"), NULL, 10);
+
+		char* buffer;
+		buffer = strtok(packet.data, "&");
+		songs[num_songs-1].filename = (char*) calloc(strlen(buffer)+1, sizeof(char));
+		strcpy(songs[num_songs-1].filename, buffer);
+		songs[num_songs-1].filesize = strtol(strtok(NULL, "&"), &ptr, 10);
 		songs[num_songs-1].current_filesize = 0;
-		songs[num_songs-1].md5sum = strtok(NULL, "&");
+		buffer = strtok(NULL, "&");
+		songs[num_songs-1].md5sum = (char*) calloc(strlen(buffer)+1, sizeof(char));
+		strcpy(songs[num_songs-1].md5sum, buffer);
 		songs[num_songs-1].id = atoi(strtok(NULL, "&"));
 		if (playlist_name == NULL){
 			songs[num_songs-1].playlist = NULL;
@@ -512,49 +520,76 @@ void receive_file(Packet packet) {
 			if (playlist_name != NULL){
 				free(songs[num_songs-1].playlist);
 			}
-			songs = (Song*) realloc(songs, --num_songs*sizeof(Song));
+			free(songs[num_songs-1].filename);
+			free(songs[num_songs-1].md5sum);
+			if (songs[num_songs-1].playlist != NULL)
+				free(songs[num_songs-1].playlist);
+			num_songs = 0;
+			if (num_songs > 0) {
+				songs = (Song*) realloc(songs, --num_songs*sizeof(Song));
+			}
+			else {
+				free(songs);
+			}
+			SEM_signal(&songs_sem);
+			free(path);
 		}
+		SEM_signal(&songs_sem);
 		free(path);
+		debug("processed new file");
 	}
 	else if (!strcmp(packet.header, "FILE_DATA")) {
-		char* temp_id = strtok(packet.data, "&");
-		short id = temp_id[0]*256 + temp_id[1];
-		char* data = strtok(NULL, "&");
+
+		char* temp_id = packet.data;
+		temp_id[2] = '\0';
+		short id = (short)(temp_id[0]*256 + temp_id[1]);
+		char* data = &temp_id[3];
 		int ffd, i;
-		int data_size = 256 - 3 - strlen("FILE_DATA");
+		int data_size = 256 - 3 - strlen("FILE_DATA") - 3;
 
-		debug("FILE_DATA");
-
-		for (i=0; i<1000; i++) {
+		SEM_wait(&songs_sem);
+		for (i=0; i<num_songs; i++) {
 			if (songs[i].id == id) {
 				break;
 			}
 		}
+		if (i == num_songs) {
+			debug("Song ID not recognised");
+			free(packet.header);
+			free(packet.data);
+			SEM_signal(&songs_sem);
+			return;
+		}
+		SEM_signal(&songs_sem);
 		ffd = songs[i].fd;
-		write(ffd, data, strlen(data));
-		free(data);
-		songs[i].current_filesize = songs[i].current_filesize + strlen(data);
+		
+		if (songs[i].current_filesize + data_size <= songs[i].filesize) {
+			write(ffd, data, data_size*sizeof(char));
+			songs[i].current_filesize = songs[i].current_filesize + data_size;
+			return;
+		} 
+		write(ffd, data, (songs[i].filesize - songs[i].current_filesize)*sizeof(char));
+		close(ffd);
+		songs[i].current_filesize = songs[i].filesize;
 
-		path = "../bowman_music/song_files/";
-		path = (char*) realloc(path, (strlen(path)+1+strlen(songs[i].filename))*sizeof(char));
+		path = (char*) calloc((strlen("bowman_music/song_files/")+1+strlen(songs[i].filename)), sizeof(char));
+		strcpy(path, "bowman_music/song_files/");
 		strcat(path, songs[i].filename);
 
-		if (data[data_size-1] == '\0') {
-
-			close(ffd);
-			char* md5sum = get_md5sum(path);
-
-			if (!strcmp(songs[i].md5sum, md5sum)) {
-				send_packet(poole_fd, 5, "CHECK_OK", "");
-			}
-			else {
-				send_packet(poole_fd, 5, "CHECK_KO", "");
-			}
-			free(md5sum);
+		char* md5sum = get_md5sum(path);
+		if (!strcmp(songs[i].md5sum, md5sum)) {
+			send_packet(poole_fd, 5, "CHECK_OK", "");
+			debug("md5sum corresponds");
 		}
+		else {
+			send_packet(poole_fd, 5, "CHECK_KO", "");
+			debug("md5sum does not correspond");
+		}
+		free(md5sum);
+		free(path);
 	}
 	else if (!strcmp(packet.header, "NOT_EXISTS")) {
-		
+		logn("Song does not exist");
 	}
 }
 
@@ -564,7 +599,7 @@ void* process_requests() {
 	int data_size;
 	fd_set set;
 	int i;
-	struct timeval timeout = {0, 1};
+	struct timeval timeout = {0, 100};
 
 	while (!close_thread){
 		FD_ZERO(&set);
@@ -575,11 +610,19 @@ void* process_requests() {
 		if (FD_ISSET(poole_fd, &set)) {
 
 			packet = read_packet(poole_fd);
-			data_size = 256 - 3 - packet.header_length;
+
+			if (!strcmp(packet.header, "SONGS_RESPONSE")) {
+				debug("--------");
+				debug(packet.header);
+				logni(packet.header_length);
+				debug(packet.data);
+				debug("--------");
+			}
 
 			switch (packet.type){
 			case 2:
 				if (!strcmp(packet.header, "SONGS_RESPONSE")) {
+					data_size = 256 - 3 - packet.header_length;
 					if (input != NULL)
 						input = (char*) realloc(input, (input_length+data_size+1)*sizeof(char));
 					else 
@@ -661,11 +704,12 @@ void check_downloads() {
 void clear_downloads() {
 
 	int i, j = 0;
-
+	
 	for (i=0; i<num_songs-j; i++) {
 
 		if (songs[i].current_filesize >= songs[i].filesize) {
 			j++;
+			SEM_wait(&songs_sem);
 		}
 		if (j > 0) {
 			songs[i].id = songs[i+j].id;
@@ -681,8 +725,15 @@ void clear_downloads() {
 			songs[i].fd = songs[i+j].fd;
 		}
 	}
-	num_songs = num_songs - j;
-	songs = (Song*) realloc(songs, sizeof(Song)*num_songs);
+
+	if (j > 0) {
+		num_songs = num_songs - j;
+		if (num_songs > 0)
+			songs = (Song*) realloc(songs, sizeof(Song)*num_songs);
+		else 
+			songs = NULL;
+		SEM_signal(&songs_sem);
+	}
 }
 
 int main(int argc, char *argv[]){
@@ -723,28 +774,8 @@ int main(int argc, char *argv[]){
 	logn(string);
 	free(string);
 
-	songs = (Song*) calloc(3, sizeof(Song));
-	songs[0].filesize = 345000;
-	songs[0].current_filesize = 123452;
-	songs[0].filename = calloc(strlen("file1.mp33"), sizeof(char));
-	strcpy(songs[0].filename, "file1.mp3");
-	songs[0].md5sum = calloc(strlen("file1.mp33"), sizeof(char));
-	strcpy(songs[0].md5sum, "file1.mp3");
-	num_songs++;
-	songs[1].filesize = 345000;
-	songs[1].current_filesize = 345000;
-	songs[1].filename = calloc(strlen("file1.mp33"), sizeof(char));
-	strcpy(songs[1].filename, "file2.mp3");
-	songs[1].md5sum = calloc(strlen("file1.mp33"), sizeof(char));
-	strcpy(songs[1].md5sum, "file1.mp3");
-	num_songs++;
-	songs[2].filesize = 345000;
-	songs[2].current_filesize = 0;
-	songs[2].filename = calloc(strlen("file1.mp33"), sizeof(char));
-	strcpy(songs[2].filename, "file3.mp3");
-	songs[2].md5sum = calloc(strlen("file1.mp33"), sizeof(char));
-	strcpy(songs[2].md5sum, "file1.mp3");
-	num_songs++;
+	SEM_destructor(&songs_sem);
+	SEM_init(&songs_sem, 1);
 
 	while (command != LOG_OUT){
 		print(1, "\n$ ");
@@ -777,7 +808,6 @@ int main(int argc, char *argv[]){
 					list_playlists();
 					break;
 				case DOWNLOAD :
-					debug("before download");
 					download(string);
 					break;
 				case CHECK_DOWNLOADS :
