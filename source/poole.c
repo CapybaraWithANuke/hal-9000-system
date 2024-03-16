@@ -66,13 +66,10 @@ typedef struct {
 Poole poole;
 semaphore print_sem;
 semaphore thread_array_sem;
-<<<<<<< HEAD
 semaphore packet_sem;
-=======
 semaphore stats_file;
 semaphore write_pipe;
 semaphore monolith_ready;
->>>>>>> f2e468a696bb1b027c570be4e7b7fe69d40135b3
 pthread_t* threads;
 int* thread_fin;
 Thread_input* inputs;
@@ -213,11 +210,9 @@ void* send_song(void* in) {
     Thread_input* input_p = (Thread_input*) in;
     int fd = (*input_p).fd;
     int thread_num = (*input_p).thread_num;
-<<<<<<< HEAD
     char* song = (*input_p).song;
     char* path = (char*) calloc(strlen("poole_music/song_names")+1, sizeof(char));
     strcpy(path, "poole_music/song_names");
-=======
 
     char* song_name = calloc(strlen(song)+1, sizeof(char));
     strcpy(song_name, song);
@@ -228,7 +223,6 @@ void* send_song(void* in) {
     SEM_signal(&write_pipe);
 
     char* path = "../poole_music/song_names";
->>>>>>> f2e468a696bb1b027c570be4e7b7fe69d40135b3
     int songs_ffd = open(path, O_RDONLY);
     if (songs_ffd == -1){
         signal_thread_end(thread_num);
@@ -516,9 +510,6 @@ int main(int argc, char *argv[]) {
     char* buffer;
     asprintf(&buffer, "%d", poole.poole_port);
 
-<<<<<<< HEAD
-    char* frame_data = calloc(strlen(poole.server_name)+strlen(poole.poole_ip)+strlen(buffer)+3, sizeof(char));
-=======
     SEM_constructor(&write_pipe);
     SEM_init(&write_pipe, 0);
     SEM_constructor(&monolith_ready);
@@ -552,8 +543,7 @@ int main(int argc, char *argv[]) {
         
     }
 
-    char* frame_data = calloc(2, sizeof(char));
->>>>>>> f2e468a696bb1b027c570be4e7b7fe69d40135b3
+    char* frame_data = calloc(strlen(poole.server_name)+strlen(poole.poole_ip)+strlen(buffer)+3, sizeof(char));
     strcat(frame_data, poole.server_name);
     strcat(frame_data, "&");
     strcat(frame_data, poole.poole_ip);
