@@ -208,31 +208,34 @@ void signal_thread_end(int thread_num) {
 void* send_song(void* in) {
 
     Thread_input* input_p = (Thread_input*) in;
-    int fd = (*input_p).fd;
-    int thread_num = (*input_p).thread_num;
-    char* song = (*input_p).song;
-    char* path = (char*) calloc(strlen("poole_music/song_names")+1, sizeof(char));
+    int fd = input_p->fd;
+    int thread_num = input_p->thread_num;
+    char* song = input_p->song;
+    char* path = (char*) calloc(strlen("poole_music/song_names") + 1, sizeof(char));
     strcpy(path, "poole_music/song_names");
 
-    char* song_name = calloc(strlen(song)+1, sizeof(char));
+    char* song_name = (char*) calloc(strlen(song) + 1, sizeof(char));
     strcpy(song_name, song);
-    song_name[strlen(song_name)-4] = '\0';
-    //logn(song_name);
+    song_name[strlen(song_name) - 4] = '\0';
+
     SEM_wait(&monolith_ready);
-    write(pip[1], song_name, strlen(song_name)+1);
+    write(pip[1], song_name, strlen(song_name) + 1);
     SEM_signal(&write_pipe);
 
-    path = '\0';
-    strcpy(path, "../poole_music/song_names");
+    free(path);
+    path = (char*) calloc(strlen("poole_music/song_names") + 1, sizeof(char));
+    strcpy(path, "poole_music/song_names");
+
     int songs_ffd = open(path, O_RDONLY);
-    if (songs_ffd == -1){
+    if (songs_ffd == -1) {
         signal_thread_end(thread_num);
         logn("error opening file");
+        free(path);
         return NULL;
     }
-    
-    char* id = (char*) calloc(1, sizeof(char));
-    char* buffer = (char*) calloc(1, sizeof(char));
+
+    char* id = NULL;
+    char* buffer = NULL;
     int found = 0;
 
     do {
@@ -243,13 +246,14 @@ void* send_song(void* in) {
         buffer = read_until(songs_ffd, '\n');
         remove_symbol(buffer, '\r');
 
-        if (!strcmp(buffer, song)) {
+        if (strcmp(buffer, song) == 0) {
             found = 1;
             break;
         }
-    } while(buffer[0] != '\0');
+    } while(buffer && buffer[0] != '\0');
 
     close(songs_ffd);
+
     if (!found) {
         free(buffer);
         free(id);
@@ -257,7 +261,7 @@ void* send_song(void* in) {
         return NULL;
     }
 
-    path = (char*) realloc(path, (strlen("poole_music/song_files/")+1+strlen(song))* sizeof(char));
+    path = (char*) realloc(path, (strlen("poole_music/song_files/") + strlen(song) + 1) * sizeof(char));
     strcpy(path, "poole_music/song_files/");
     strcat(path, song);
     free(song);
@@ -267,8 +271,10 @@ void* send_song(void* in) {
     struct stat file_info;
     if (stat(path, &file_info) == -1) {
         signal_thread_end(thread_num);
+        free(path);
         return NULL;
     }
+
     char* filesize;
     asprintf(&filesize, "%ld", file_info.st_size);
 
@@ -278,7 +284,7 @@ void* send_song(void* in) {
     id_conv[1] = id_int % 256;
     id_conv[2] = '\0';
 
-    buffer = (char*) realloc(buffer, ((strlen(buffer)+strlen(filesize)+strlen(md5sum)+strlen(id)+4)*sizeof(char)));
+    buffer = (char*) realloc(buffer, (strlen(buffer) + strlen(filesize) + strlen(md5sum) + strlen(id) + 4) * sizeof(char));
     strcat(buffer, "&");
     strcat(buffer, filesize);
     strcat(buffer, "&");
@@ -286,6 +292,7 @@ void* send_song(void* in) {
     strcat(buffer, "&");
     strcat(buffer, id);
     send_ppacket(fd, 4, "NEW_FILE", buffer);
+
     free(buffer);
     free(md5sum);
     free(filesize);
@@ -293,19 +300,20 @@ void* send_song(void* in) {
 
     int ffd = open(path, O_RDONLY);
     free(path);
-    if (ffd == -1){
+    if (ffd == -1) {
         free(id_conv);
         send_ppacket(fd, 4, "ERROR_FILE", "");
         signal_thread_end(thread_num);
         return NULL;
     }
+
     int data_length = 256 - 3 - 3 - strlen("FILE_DATA");
-    buffer = (char*) calloc(data_length+1, sizeof(char));
+    buffer = (char*) calloc(data_length + 1, sizeof(char));
 
     int size_read, i, j;
-    for (i=0; i<(int)file_info.st_size; i=i+data_length) {
-        size_read = read(ffd, buffer, sizeof(char)*data_length);
-        for (j=size_read; j<data_length; j++) {
+    for (i = 0; i < (int)file_info.st_size; i += data_length) {
+        size_read = read(ffd, buffer, sizeof(char) * data_length);
+        for (j = size_read; j < data_length; j++) {
             buffer[j] = '\0';
         }
         buffer[data_length] = '\0';
@@ -313,11 +321,14 @@ void* send_song(void* in) {
         send_file_packet(fd, id_conv, buffer);
         SEM_signal(&packet_sem);
     }
+
     debug("finished sending song");
+
     free(buffer);
     free(id_conv);
     signal_thread_end(thread_num);
     return NULL;
+
 }
 
 void send_playlist(int fd, char* playlist) {
