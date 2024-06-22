@@ -376,7 +376,8 @@ void list_playlists() {
 			playlists[num_playlists][num_songs[num_playlists]][num_char] ='\0';
 			num_char = 0;
 			num_songs[num_playlists]++;
-			playlists = (char***) realloc(playlists, (++num_playlists + 1)*sizeof(char**));
+			playlists = (char***) realloc(playlists, (num_playlists + 2)*sizeof(char**));
+			num_playlists++;
 			playlists[num_playlists] = (char**) calloc(1, sizeof(char*));
 			playlists[num_playlists][0] = (char*) calloc(1, sizeof(char));
 			num_songs[num_playlists] = 0;
@@ -384,13 +385,14 @@ void list_playlists() {
 		else if (input[i] == '&'){
 			playlists[num_playlists][num_songs[num_playlists]][num_char] ='\0';
 			num_char = 0;
-			playlists[num_playlists] = (char**) realloc(playlists[num_playlists], (++num_songs[num_playlists] + 1)*sizeof(char));
+			num_songs[num_playlists]++;
+			playlists[num_playlists] = (char**) realloc(playlists[num_playlists], (num_songs[num_playlists] + 1) * sizeof(char*));
 			playlists[num_playlists][num_songs[num_playlists]] = (char*) calloc(1, sizeof(char));
-
 		}
 		else {
 			playlists[num_playlists][num_songs[num_playlists]][num_char] = input[i];
-			playlists[num_playlists][num_songs[num_playlists]] = (char*) realloc(playlists[num_playlists][num_songs[num_playlists]], (++num_char + 1)*sizeof(char));
+			playlists[num_playlists][num_songs[num_playlists]] = (char*) realloc(playlists[num_playlists][num_songs[num_playlists]], (num_char + 2) * sizeof(char));
+			num_char++;
 		}
 	}
 	log("There are "); logi(num_playlists); logn(" lists available for download:");
@@ -417,6 +419,7 @@ void list_playlists() {
 	free(input);
 	input = NULL;
 	input_length = 0;
+
 }
 
 void download(char* string) {

@@ -222,7 +222,8 @@ void* send_song(void* in) {
     write(pip[1], song_name, strlen(song_name)+1);
     SEM_signal(&write_pipe);
 
-    char* path = "../poole_music/song_names";
+    path = '\0';
+    strcpy(path, "../poole_music/song_names");
     int songs_ffd = open(path, O_RDONLY);
     if (songs_ffd == -1){
         signal_thread_end(thread_num);
@@ -676,7 +677,7 @@ int main(int argc, char *argv[]) {
                             SEM_wait(&print_sem);
                             logn("New request - "); log(names_bowmans[i]); logn(" requires the list of playlists.");
                             log("Sending playlist list to "); logn(names_bowmans[i]);
-                            SEM_signal(&print_sem); 
+                            SEM_signal(&print_sem);
                             list_playlists(sockets_fd[i]);
                         }
                         break;
