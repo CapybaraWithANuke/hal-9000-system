@@ -508,6 +508,8 @@ void receive_file(Packet packet) {
 		songs[num_songs-1].md5sum = (char*) calloc(strlen(buffer)+1, sizeof(char));
 		strcpy(songs[num_songs-1].md5sum, buffer);
 		songs[num_songs-1].id = atoi(strtok(NULL, "&"));
+		debug("song id: ");
+		logni(songs[num_songs-1].id);
 		if (playlist_name == NULL){
 			songs[num_songs-1].playlist = NULL;
 		}
@@ -519,6 +521,7 @@ void receive_file(Packet packet) {
 		strcat(path, songs[num_songs-1].filename);
 
 		if (((songs[num_songs-1].fd) = open(path, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR)) < 0) {
+			debug("error opening file");
 			free(songs[num_songs-1].filename);
 			if (playlist_name != NULL){
 				free(songs[num_songs-1].playlist);
@@ -552,12 +555,18 @@ void receive_file(Packet packet) {
 
 		SEM_wait(&songs_sem);
 		for (i=0; i<num_songs; i++) {
+			//logni(songs[i].id);
+			//logni(id);
 			if (songs[i].id == id) {
 				break;
 			}
 		}
+		/*debug("i:      num_songs: ");
+		logni(i);
+		logni(num_songs);*/
 		if (i == num_songs) {
 			debug("Song ID not recognised");
+			//logni(id);
 			free(packet.header);
 			free(packet.data);
 			SEM_signal(&songs_sem);

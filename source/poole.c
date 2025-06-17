@@ -403,7 +403,7 @@ void monolith(int fd_pipe) {
 
     while(1) {
 
-        SEM_signal(&monolith_ready);
+        /*SEM_signal(&monolith_ready);
         SEM_wait(&write_pipe);
         song_name = read_until(fd_pipe, '\0');
         logn(song_name);
@@ -456,7 +456,7 @@ void monolith(int fd_pipe) {
 
     }
     free(song_name);
-    close(fd_pipe);
+    close(fd_pipe);*/
     return;
 }
 
